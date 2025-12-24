@@ -1,11 +1,12 @@
 {
   "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/teams/my-teams/route": "app/api/teams/my-teams/route.js",
   "/api/tournaments/route": "app/api/tournaments/route.js",
+  "/api/teams/my-teams/route": "app/api/teams/my-teams/route.js",
   "/api/registrations/my-registrations/route": "app/api/registrations/my-registrations/route.js",
-  "/page": "app/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/users/profile/route": "app/api/users/profile/route.js",
   "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
   "/(dashboard)/tournaments/page": "app/(dashboard)/tournaments/page.js",
+  "/(dashboard)/my-teams/page": "app/(dashboard)/my-teams/page.js",
+  "/(dashboard)/profile/page": "app/(dashboard)/profile/page.js",
   "/(dashboard)/admin/page": "app/(dashboard)/admin/page.js"
 }

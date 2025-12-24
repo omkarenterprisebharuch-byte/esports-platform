@@ -10,7 +10,7 @@ coverage
 .next/
 out/
 build
-
+.next
 # Production
 dist
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
+import { LoaderProvider, Loader, NavigationLoader } from "@/components/ui/Loader";
 
 // Lazy load notification prompt - not critical for initial render
 const NotificationPrompt = dynamic(
@@ -126,22 +127,18 @@ export default function DashboardLayout({
 
   const isAdminOrHost = user?.is_admin === true || user?.is_host === true;
 
-  // Show skeleton while loading - only on first load
+  // Show blob loader while loading - only on first load
   if (initialLoading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="flex items-center justify-center h-screen">
-          <div className="text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-gray-900 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-500 text-sm">Loading...</p>
-          </div>
-        </div>
+        <Loader message="Loading your dashboard..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <LoaderProvider>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
@@ -317,6 +314,12 @@ export default function DashboardLayout({
 
       {/* Notification Permission Prompt */}
       <NotificationPrompt showOnDenied />
-    </div>
+      
+      {/* Navigation Loader - shows during page transitions */}
+      <Suspense fallback={null}>
+        <NavigationLoader />
+      </Suspense>
+      </div>
+    </LoaderProvider>
   );
 }
