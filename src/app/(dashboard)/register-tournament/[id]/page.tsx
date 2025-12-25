@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { TournamentWithHost, Team, TeamMemberWithUser } from "@/types";
+import { useRegistrationCache } from "@/hooks/useRegistrationCache";
 
 interface TeamWithMembers extends Team {
   members?: TeamMemberWithUser[];
@@ -12,6 +13,11 @@ interface TeamWithMembers extends Team {
 export default function RegisterTournamentPage() {
   const params = useParams();
   const router = useRouter();
+  
+  // Use cached registration data
+  const { isRegistered, addRegistration } = useRegistrationCache();
+  const isAlreadyRegistered = isRegistered(Number(params.id));
+  
   const [tournament, setTournament] = useState<TournamentWithHost | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
@@ -20,13 +26,13 @@ export default function RegisterTournamentPage() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
-  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("token");
 
+    // Only fetch tournament and teams - registration status from cache
     Promise.all([
       fetch(`/api/tournaments/${params.id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -34,23 +40,14 @@ export default function RegisterTournamentPage() {
       fetch("/api/teams/my-teams", {
         headers: { Authorization: `Bearer ${token}` },
       }).then((res) => res.json()),
-      fetch("/api/registrations/my-registrations", {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => res.json()),
     ])
-      .then(([tournamentData, teamsData, registrationsData]) => {
+      .then(([tournamentData, teamsData]) => {
         if (tournamentData.success) {
           setTournament(tournamentData.data.tournament);
         }
         if (teamsData.success) {
           setTeams(teamsData.data.teams || []);
         }
-        // Check if user is already registered for this tournament
-        const registrations = registrationsData.data?.registrations || [];
-        const isRegistered = registrations.some(
-          (reg: { tournament_id: number }) => reg.tournament_id === Number(params.id)
-        );
-        setIsAlreadyRegistered(isRegistered);
       })
       .finally(() => setLoading(false));
   }, [params.id]);
@@ -160,6 +157,9 @@ export default function RegisterTournamentPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // Update the registration cache
+        addRegistration(tournament.id);
+        
         setSuccess(
           `Successfully registered! Your slot number is #${data.data.slot_number}`
         );

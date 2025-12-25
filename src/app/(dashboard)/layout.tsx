@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import { LoaderProvider, Loader, NavigationLoader } from "@/components/ui/Loader";
+import { RegistrationCacheProvider } from "@/hooks/useRegistrationCache";
 
 // Lazy load notification prompt - not critical for initial render
 const NotificationPrompt = dynamic(
@@ -108,7 +109,15 @@ export default function DashboardLayout({
 
   useEffect(() => {
     // Prevent duplicate fetches in development strict mode
-    if (fetchedRef.current) return;
+    if (fetchedRef.current) {
+      // Already fetched, just make sure loading is false
+      if (cachedUser) {
+        setInitialLoading(false);
+        setUser(cachedUser);
+        setTeamsCount(cachedTeamsCount);
+      }
+      return;
+    }
     fetchedRef.current = true;
     
     fetchUserData();
@@ -128,7 +137,8 @@ export default function DashboardLayout({
   const isAdminOrHost = user?.is_admin === true || user?.is_host === true;
 
   // Show blob loader while loading - only on first load
-  if (initialLoading || !user) {
+  // Use initialLoading as the primary condition, user check is secondary
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         <Loader message="Loading your dashboard..." />
@@ -136,8 +146,14 @@ export default function DashboardLayout({
     );
   }
 
+  // If not loading but no user, redirect is already in progress
+  if (!user) {
+    return null;
+  }
+
   return (
     <LoaderProvider>
+      <RegistrationCacheProvider>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Mobile Overlay */}
       {sidebarOpen && (
@@ -320,6 +336,7 @@ export default function DashboardLayout({
         <NavigationLoader />
       </Suspense>
       </div>
+      </RegistrationCacheProvider>
     </LoaderProvider>
   );
 }

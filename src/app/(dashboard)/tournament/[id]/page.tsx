@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { TournamentWithHost } from "@/types";
 import { LazyRoomCredentials } from "@/components/ui";
 import { SkeletonBanner, SkeletonStatsGrid, SkeletonDetails } from "@/components/ui/Skeleton";
+import { useRegistrationCache } from "@/hooks/useRegistrationCache";
 
 // Lazy load chat components - only loaded when user opens chat
 const ChatButton = dynamic(() => import("@/components/chat/ChatButton"), {
@@ -40,12 +41,17 @@ export default function TournamentDetailsPage() {
   const params = useParams();
   const router = useRouter();
   
+  // Use cached registration data
+  const { isRegistered, addRegistration } = useRegistrationCache();
+  
   // Core data - fetched immediately (essential for page)
   const [tournament, setTournament] = useState<TournamentWithHost | null>(null);
-  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  
+  // Derived from cache
+  const isAlreadyRegistered = isRegistered(Number(params.id));
   
   // On-demand data - fetched only when user explicitly requests
   const [winners, setWinners] = useState<Winners | null>(null);
@@ -60,28 +66,19 @@ export default function TournamentDetailsPage() {
 
   // Fetch only essential data on page load
   // Winners, room credentials, and chat are loaded on-demand
+  // Registration status comes from cache
   useEffect(() => {
     const token = localStorage.getItem("token");
 
-    // Only 2 API calls instead of 5+
-    Promise.all([
-      fetch(`/api/tournaments/${params.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => res.json()),
-      fetch("/api/registrations/my-registrations", {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => res.json()),
-    ])
-      .then(([tournamentData, registrationsData]) => {
+    // Only 1 API call - registration status from cache
+    fetch(`/api/tournaments/${params.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((tournamentData) => {
         if (tournamentData.success) {
           setTournament(tournamentData.data.tournament);
         }
-        
-        const registrations = registrationsData.data?.registrations || [];
-        const isRegistered = registrations.some(
-          (reg: { tournament_id: string | number }) => String(reg.tournament_id) === String(params.id)
-        );
-        setIsAlreadyRegistered(isRegistered);
       })
       .finally(() => setLoading(false));
   }, [params.id]);
@@ -189,7 +186,7 @@ export default function TournamentDetailsPage() {
           type: "success",
           text: `Successfully registered! Your slot number is #${data.data.slot_number}`,
         });
-        setIsAlreadyRegistered(true);
+        addRegistration(Number(params.id));
         
         // Refresh tournament data for updated team count
         const refreshRes = await fetch(`/api/tournaments/${params.id}`, {

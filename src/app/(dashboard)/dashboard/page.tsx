@@ -6,34 +6,26 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { TournamentWithHost } from "@/types";
 import { SkeletonTournamentGrid } from "@/components/ui/Skeleton";
+import { useRegistrationCache } from "@/hooks/useRegistrationCache";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [tournaments, setTournaments] = useState<TournamentWithHost[]>([]);
-  const [registeredTournamentIds, setRegisteredTournamentIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
+  
+  // Use cached registration IDs instead of fetching on every page load
+  const { registeredIds, isRegistered } = useRegistrationCache();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
 
-    // Fetch tournaments and registrations in parallel
-    Promise.all([
-      fetch("/api/tournaments", {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => res.json()),
-      fetch("/api/registrations/my-registrations", {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then((res) => res.json()),
-    ])
-      .then(([tournamentsData, registrationsData]) => {
-        setTournaments(tournamentsData.data?.tournaments || []);
-        
-        // Extract registered tournament IDs
-        const registrations = registrationsData.data?.registrations || [];
-        const registeredIds = new Set<number>(
-          registrations.map((reg: { tournament_id: number }) => reg.tournament_id)
-        );
-        setRegisteredTournamentIds(registeredIds);
+    // Only fetch tournaments - registrations come from cache
+    fetch("/api/tournaments", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setTournaments(data.data?.tournaments || []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -73,8 +65,8 @@ export default function DashboardPage() {
   }: {
     tournament: TournamentWithHost;
   }) => {
-    // Check if user is already registered
-    const isAlreadyRegistered = registeredTournamentIds.has(tournament.id);
+    // Check if user is already registered using cached data
+    const isAlreadyRegistered = isRegistered(tournament.id);
     
     // Check if registration is currently open
     const now = new Date();

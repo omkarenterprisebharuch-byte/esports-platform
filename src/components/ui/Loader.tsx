@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode, useRef, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 interface LoaderContextType {
@@ -191,29 +191,52 @@ export function PageLoader() {
 }
 
 /**
- * Navigation loader that shows during page transitions
- * Automatically shows loader when navigating between pages
+ * Internal navigation loader component
+ * Separated to handle useSearchParams which requires Suspense
  */
-export function NavigationLoader() {
+function NavigationLoaderInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isNavigating, setIsNavigating] = useState(false);
-  const [prevPath, setPrevPath] = useState(pathname);
+  const [prevPath, setPrevPath] = useState<string | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track path changes to hide loader when navigation completes
   useEffect(() => {
-    const currentPath = pathname + searchParams.toString();
-    const previousPath = prevPath + searchParams.toString();
+    const currentPath = pathname + (searchParams?.toString() || '');
+    
+    if (prevPath === null) {
+      // First render - just set the path
+      setPrevPath(currentPath);
+      return;
+    }
     
     // Path changed - navigation completed
-    if (currentPath !== previousPath) {
-      setPrevPath(pathname);
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        setIsNavigating(false);
-      }, 100);
-      return () => clearTimeout(timer);
+    if (currentPath !== prevPath) {
+      setPrevPath(currentPath);
+      // Immediately hide loader when navigation completes
+      setIsNavigating(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     }
   }, [pathname, searchParams, prevPath]);
+
+  // Safety timeout - always hide loader after max time
+  useEffect(() => {
+    if (isNavigating) {
+      timeoutRef.current = setTimeout(() => {
+        setIsNavigating(false);
+      }, 5000); // Max 5 seconds
+      
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }
+  }, [isNavigating]);
 
   // Listen for link clicks to show loader immediately
   useEffect(() => {
@@ -227,6 +250,7 @@ export function NavigationLoader() {
         if (href && 
             href.startsWith('/') && 
             !href.startsWith('//') && 
+            !href.startsWith('#') &&
             href !== pathname &&
             !link.getAttribute('target') &&
             !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -235,21 +259,27 @@ export function NavigationLoader() {
       }
     };
 
-    // Listen for programmatic navigation via buttons that trigger router.push
-    const handleBeforeUnload = () => {
-      setIsNavigating(true);
-    };
-
     document.addEventListener('click', handleClick);
-    window.addEventListener('beforeunload', handleBeforeUnload);
     
     return () => {
       document.removeEventListener('click', handleClick);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [pathname]);
 
   if (!isNavigating) return null;
 
   return <Loader message="Loading..." />;
+}
+
+/**
+ * Navigation loader that shows during page transitions
+ * Automatically shows loader when navigating between pages
+ * Wrapped in Suspense for useSearchParams compatibility
+ */
+export function NavigationLoader() {
+  return (
+    <Suspense fallback={null}>
+      <NavigationLoaderInner />
+    </Suspense>
+  );
 }

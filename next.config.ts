@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  // Set output file tracing root to this directory to avoid lockfile detection issues
+  outputFileTracingRoot: path.join(__dirname),
+
   // Enable React strict mode for better development experience
   reactStrictMode: true,
 
