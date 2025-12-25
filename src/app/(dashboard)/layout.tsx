@@ -31,7 +31,6 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 const menuItems = [
   { icon: "🏠", label: "Dashboard", href: "/dashboard" },
-  { icon: "🏆", label: "Tournaments", href: "/tournaments" },
   { icon: "👤", label: "Profile", href: "/profile" },
   { icon: "👥", label: "My Teams", href: "/my-teams" },
   { icon: "💰", label: "Wallet", href: "/wallet", disabled: true },

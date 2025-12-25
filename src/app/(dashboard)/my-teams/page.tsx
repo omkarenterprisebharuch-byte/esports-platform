@@ -1,20 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useState, useCallback } from "react";
 
 interface Team {
   id: number;
   team_name: string;
   team_code: string;
+  invite_code: string;
   total_members: number;
   max_members: number;
   role: string;
   game_uid: string;
   game_name: string;
   captain_name: string;
+  captain_id: number;
   is_captain: boolean;
   created_at: string;
+}
+
+interface TeamMember {
+  id: number;
+  user_id: number;
+  role: string;
+  game_uid: string;
+  game_name: string;
+  username: string;
+  avatar_url: string | null;
+  joined_at: string;
+}
+
+interface ExpandedTeamData {
+  members: TeamMember[];
+  loading: boolean;
+  error: string | null;
 }
 
 export default function MyTeamsPage() {
@@ -22,10 +40,27 @@ export default function MyTeamsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [expandedTeams, setExpandedTeams] = useState<Record<number, ExpandedTeamData>>({});
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   useEffect(() => {
     fetchTeams();
+    fetchCurrentUser();
   }, []);
+
+  const fetchCurrentUser = () => {
+    const token = localStorage.getItem("token");
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          setCurrentUserId(data.data.id);
+        }
+      });
+  };
 
   const fetchTeams = () => {
     const token = localStorage.getItem("token");
@@ -39,6 +74,112 @@ export default function MyTeamsPage() {
         }
       })
       .finally(() => setLoading(false));
+  };
+
+  const toggleTeamExpansion = useCallback(async (teamId: number) => {
+    // If already expanded, collapse it
+    if (expandedTeams[teamId]?.members?.length > 0) {
+      setExpandedTeams(prev => {
+        const newState = { ...prev };
+        delete newState[teamId];
+        return newState;
+      });
+      return;
+    }
+
+    // Start loading
+    setExpandedTeams(prev => ({
+      ...prev,
+      [teamId]: { members: [], loading: true, error: null }
+    }));
+
+    const token = localStorage.getItem("token");
+    
+    try {
+      const res = await fetch(`/api/teams/${teamId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setExpandedTeams(prev => ({
+          ...prev,
+          [teamId]: { 
+            members: data.data.team?.members || [], 
+            loading: false, 
+            error: null 
+          }
+        }));
+      } else {
+        setExpandedTeams(prev => ({
+          ...prev,
+          [teamId]: { members: [], loading: false, error: data.message || "Failed to load" }
+        }));
+      }
+    } catch {
+      setExpandedTeams(prev => ({
+        ...prev,
+        [teamId]: { members: [], loading: false, error: "Failed to load members" }
+      }));
+    }
+  }, [expandedTeams]);
+
+  const handleLeaveTeam = async (teamId: number) => {
+    if (!confirm("Are you sure you want to leave this team?")) return;
+
+    setActionLoading(teamId);
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch(`/api/teams/${teamId}/leave`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        // Refresh teams list
+        fetchTeams();
+        // Remove from expanded state
+        setExpandedTeams(prev => {
+          const newState = { ...prev };
+          delete newState[teamId];
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error("Failed to leave team:", error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: number) => {
+    if (!confirm("Are you sure you want to delete this team? This action cannot be undone.")) return;
+
+    setActionLoading(teamId);
+    const token = localStorage.getItem("token");
+
+    try {
+      const res = await fetch(`/api/teams/${teamId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        // Refresh teams list
+        fetchTeams();
+        // Remove from expanded state
+        setExpandedTeams(prev => {
+          const newState = { ...prev };
+          delete newState[teamId];
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error("Failed to delete team:", error);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   if (loading) {
@@ -72,43 +213,152 @@ export default function MyTeamsPage() {
       {teams.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
           <p className="text-5xl mb-4">👥</p>
-          <p className="text-gray-500 mb-2">You don't have any teams yet</p>
+          <p className="text-gray-500 mb-2">You don&apos;t have any teams yet</p>
           <p className="text-sm text-gray-400">
             Create a new team or join an existing one
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teams.map((team) => (
-            <Link key={team.id} href={`/team/${team.id}`}>
-              <div className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition cursor-pointer">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-900">
-                      {team.team_name}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      Captain: {team.captain_name}
-                    </p>
+        <div className="space-y-4">
+          {teams.map((team) => {
+            const isExpanded = !!expandedTeams[team.id]?.members?.length;
+            const expandedData = expandedTeams[team.id];
+            const isOwner = team.captain_id === currentUserId;
+
+            return (
+              <div 
+                key={team.id} 
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden"
+              >
+                {/* Team Header */}
+                <div className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-lg">
+                        {team.team_name}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Captain: {team.captain_name}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {team.is_captain && (
+                        <span className="bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded">
+                          Captain
+                        </span>
+                      )}
+                      <span className="font-mono text-gray-900 bg-gray-100 px-3 py-1 rounded text-sm">
+                        #{team.team_code}
+                      </span>
+                    </div>
                   </div>
-                  {team.is_captain && (
-                    <span className="bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded">
-                      Captain
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">
+                      {team.total_members}/{team.max_members} Members
                     </span>
-                  )}
+                    
+                    <button
+                      onClick={() => toggleTeamExpansion(team.id)}
+                      className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900 font-medium transition"
+                    >
+                      {expandedData?.loading ? (
+                        <>
+                          <span className="animate-spin w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full"></span>
+                          Loading...
+                        </>
+                      ) : isExpanded ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                          Hide Members
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                          View Player List
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">
-                    {team.total_members}/{team.max_members} Members
-                  </span>
-                  <span className="font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                    #{team.team_code}
-                  </span>
-                </div>
+                {/* Expanded Members Section */}
+                {isExpanded && expandedData && (
+                  <div className="border-t border-gray-100 bg-gray-50 p-6">
+                    {expandedData.error ? (
+                      <p className="text-red-500 text-sm">{expandedData.error}</p>
+                    ) : (
+                      <>
+                        {/* Invite Code */}
+                        <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
+                          <span className="text-sm text-gray-600">Invite Code:</span>
+                          <span className="font-mono text-lg font-bold text-gray-900 bg-white px-3 py-1 rounded border">
+                            {team.invite_code || team.team_code}
+                          </span>
+                        </div>
+
+                        {/* Members List */}
+                        <h4 className="font-semibold text-gray-900 mb-3">
+                          Team Members ({expandedData.members.length})
+                        </h4>
+                        <div className="space-y-2 mb-4">
+                          {expandedData.members.map((member) => (
+                            <div
+                              key={member.id}
+                              className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-100"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-600 font-semibold">
+                                  {member.username?.charAt(0).toUpperCase() || "?"}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">{member.username}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {member.game_name} • UID: {member.game_uid}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {member.role === "captain" && (
+                                <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                                  Captain
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="pt-4 border-t border-gray-200">
+                          {isOwner ? (
+                            <button
+                              onClick={() => handleDeleteTeam(team.id)}
+                              disabled={actionLoading === team.id}
+                              className="w-full py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {actionLoading === team.id ? "Deleting..." : "Delete Team"}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleLeaveTeam(team.id)}
+                              disabled={actionLoading === team.id}
+                              className="w-full py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                            >
+                              {actionLoading === team.id ? "Leaving..." : "Leave Team"}
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       )}
 

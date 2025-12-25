@@ -1,34 +1,62 @@
 "use client";
-
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { TournamentWithHost } from "@/types";
-import { SkeletonTournamentGrid } from "@/components/ui/Skeleton";
 import { useRegistrationCache } from "@/hooks/useRegistrationCache";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [tournaments, setTournaments] = useState<TournamentWithHost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
   
   // Use cached registration IDs instead of fetching on every page load
-  const { registeredIds, isRegistered } = useRegistrationCache();
+  const { registeredIds } = useRegistrationCache();
 
-  useEffect(() => {
+  const fetchTournaments = useCallback(() => {
+    setLoading(true);
     const token = localStorage.getItem("token");
 
-    // Only fetch tournaments - registrations come from cache
-    fetch("/api/tournaments", {
+    // Handle "registered" filter client-side using cached data
+    if (filter === "registered") {
+      fetch("/api/tournaments", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            const allTournaments = data.data.tournaments || [];
+            const registered = allTournaments.filter((t: TournamentWithHost) => 
+              registeredIds.has(t.id)
+            );
+            setTournaments(registered);
+          }
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    const url =
+      filter === "all"
+        ? "/api/tournaments"
+        : `/api/tournaments?filter=${filter}`;
+
+    fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => {
-        setTournaments(data.data?.tournaments || []);
+        if (data.success) {
+          setTournaments(data.data.tournaments || []);
+        }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [filter, registeredIds]);
+
+  useEffect(() => {
+    fetchTournaments();
+  }, [fetchTournaments]);
 
   const formatDate = (dateString: Date | string) => {
     if (!dateString) return "TBD";
@@ -60,179 +88,144 @@ export default function DashboardPage() {
     return styles[status] || styles.upcoming;
   };
 
-  const TournamentCard = ({
-    tournament,
-  }: {
-    tournament: TournamentWithHost;
-  }) => {
-    // Check if user is already registered using cached data
-    const isAlreadyRegistered = isRegistered(tournament.id);
-    
-    // Check if registration is currently open
-    const now = new Date();
-    const regStart = new Date(tournament.registration_start_date);
-    const regEnd = new Date(tournament.registration_end_date);
-    const isRegistrationOpen = now >= regStart && now < regEnd;
-    const hasSpots = tournament.current_teams < tournament.max_teams;
-    const canRegister = isRegistrationOpen && hasSpots && !isAlreadyRegistered;
-
-    // Determine button state
-    const getRegisterButtonState = () => {
-      if (isAlreadyRegistered) return { text: "Already Registered", disabled: true, isRegistered: true };
-      if (now < regStart) return { text: "Coming Soon", disabled: true, isRegistered: false };
-      if (now >= regEnd) return { text: "Closed", disabled: true, isRegistered: false };
-      if (!hasSpots) return { text: "Full", disabled: true, isRegistered: false };
-      return { text: "Register Now", disabled: false, isRegistered: false };
-    };
-
-    const buttonState = getRegisterButtonState();
-
-    return (
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-        <div className="relative h-40 bg-gray-100 flex items-center justify-center">
-          {tournament.tournament_banner_url ? (
-            <Image
-              src={tournament.tournament_banner_url}
-              alt={tournament.tournament_name}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              loading="lazy"
-              className="object-cover"
-            />
-          ) : (
-            <span className="text-5xl">{getGameEmoji(tournament.game_type)}</span>
-          )}
-          <span
-            className={`absolute top-3 right-3 px-2 py-1 rounded text-xs font-semibold uppercase ${getStatusStyle(tournament.status)}`}
-          >
-            {tournament.status.replace("_", " ")}
-          </span>
-          <span className="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-full text-xs uppercase">
-            {tournament.game_type}
-          </span>
-        </div>
-
-        <div className="p-4">
-          <h3 className="font-semibold text-gray-900 truncate mb-1">
-            {tournament.tournament_name}
-          </h3>
-          <p className="text-sm text-gray-500 mb-3">
-            by {tournament.host_name}
-          </p>
-
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-gray-50 rounded-lg p-2 text-center">
-              <p className="text-xs text-gray-500">Prize Pool</p>
-              <p className="font-bold text-green-600">
-                ₹{tournament.prize_pool}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-2 text-center">
-              <p className="text-xs text-gray-500">Entry</p>
-              <p className="font-bold text-gray-900">
-                {tournament.entry_fee > 0 ? `₹${tournament.entry_fee}` : "Free"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-            <span>
-              {tournament.current_teams}/{tournament.max_teams} {tournament.tournament_type === "solo" ? "Players" : "Teams"}
-            </span>
-            <span className="uppercase text-xs font-medium text-gray-600">
-              {tournament.tournament_type}
-            </span>
-          </div>
-
-          <div className="text-xs text-gray-500 mb-3">
-            📅 Starts: {formatDate(tournament.tournament_start_date)}
-          </div>
-
-          {/* Action Buttons - Always show both Register and View Details */}
-          <div className="flex gap-2 pt-3 border-t border-gray-100">
-            {isAlreadyRegistered ? (
-              <div className="flex-1 py-2 bg-blue-100 text-blue-700 font-medium rounded-lg text-sm text-center">
-                ✓ Already Registered
-              </div>
-            ) : canRegister ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(`/register-tournament/${tournament.id}`);
-                }}
-                className="flex-1 py-2 bg-green-600 text-white font-medium rounded-lg text-sm hover:bg-green-700 transition"
-              >
-                {buttonState.text}
-              </button>
-            ) : (
-              <button
-                disabled
-                className="flex-1 py-2 bg-gray-300 text-gray-500 font-medium rounded-lg text-sm cursor-not-allowed"
-              >
-                {buttonState.text}
-              </button>
-            )}
-            <Link href={`/tournament/${tournament.id}`} className="flex-1">
-              <button className="w-full py-2 bg-gray-100 text-gray-700 font-medium rounded-lg text-sm hover:bg-gray-200 transition">
-                View Details
-              </button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Skeleton loading for better perceived performance
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              🎮 Tournaments
-            </h2>
-            <div className="h-5 w-20 bg-gray-200 rounded animate-pulse" />
-          </div>
-          <SkeletonTournamentGrid count={6} />
-        </section>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8">
-      {/* All Tournaments Section */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            🎮 Tournaments
-          </h2>
-          <Link
-            href="/tournaments"
-            className="text-sm text-gray-600 hover:text-gray-900"
-          >
-            View all →
-          </Link>
-        </div>
+    <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">All Tournaments</h1>
 
-        {tournaments.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-            <p className="text-gray-500 mb-2">
-              No tournaments available
-            </p>
-            <p className="text-sm text-gray-400">
-              Check back later for new tournaments
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {tournaments.map((tournament) => (
-              <TournamentCard key={tournament.id} tournament={tournament} />
-            ))}
-          </div>
-        )}
-      </section>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { value: "all", label: "All" },
+            { value: "registered", label: "Registered" },
+            { value: "live", label: "Live" },
+            { value: "upcoming", label: "Upcoming" },
+            { value: "ongoing", label: "Ongoing" },
+          ].map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setFilter(item.value)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                filter === item.value
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-4 border-gray-900 border-t-transparent rounded-full"></div>
+        </div>
+      ) : tournaments.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <p className="text-gray-500">No tournaments found</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tournaments.map((tournament) => (
+            <Link key={tournament.id} href={`/tournament/${tournament.id}`}>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md hover:scale-[1.02] transition cursor-pointer h-full">
+                <div className="relative h-40 bg-gray-100 flex items-center justify-center">
+                  <span className="text-5xl">
+                    {getGameEmoji(tournament.game_type)}
+                  </span>
+                  <span
+                    className={`absolute top-3 right-3 px-2 py-1 rounded text-xs font-semibold uppercase ${getStatusStyle(tournament.status)}`}
+                  >
+                    {tournament.status.replace("_", " ")}
+                  </span>
+                  <span className="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-full text-xs uppercase">
+                    {tournament.game_type}
+                  </span>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="font-semibold text-gray-900 truncate mb-1">
+                    {tournament.tournament_name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-3">
+                    by {tournament.host_name}
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="bg-gray-50 rounded-lg p-2 text-center">
+                      <p className="text-xs text-gray-500">Prize</p>
+                      <p className="font-bold text-green-600">
+                        ₹{tournament.prize_pool}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-2 text-center">
+                      <p className="text-xs text-gray-500">Entry</p>
+                      <p className="font-bold text-gray-900">
+                        {tournament.entry_fee > 0
+                          ? `₹${tournament.entry_fee}`
+                          : "Free"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                    <span>
+                      {tournament.current_teams}/{tournament.max_teams} Teams
+                    </span>
+                    <span>📅 {formatDate(tournament.tournament_start_date)}</span>
+                  </div>
+
+                  {/* Registration Status */}
+                  {registeredIds.has(tournament.id) ? (
+                    <div className="py-2 bg-blue-100 text-blue-700 font-medium rounded-lg text-sm text-center">
+                      ✓ You & your team is already registered
+                    </div>
+                  ) : (() => {
+                    const now = new Date();
+                    const regStart = new Date(tournament.registration_start_date);
+                    const regEnd = new Date(tournament.registration_end_date);
+                    const isOpen = now >= regStart && now < regEnd;
+                    const hasSpots = tournament.current_teams < tournament.max_teams;
+                    
+                    if (isOpen && hasSpots) {
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            router.push(`/register-tournament/${tournament.id}`);
+                          }}
+                          className="w-full py-2 bg-green-600 text-white font-medium rounded-lg text-sm hover:bg-green-700 transition"
+                        >
+                          Register Now
+                        </button>
+                      );
+                    } else if (now < regStart) {
+                      return (
+                        <div className="py-2 bg-gray-100 text-gray-500 font-medium rounded-lg text-sm text-center">
+                          Coming Soon
+                        </div>
+                      );
+                    } else if (!hasSpots) {
+                      return (
+                        <div className="py-2 bg-gray-100 text-gray-500 font-medium rounded-lg text-sm text-center">
+                          Full
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="py-2 bg-gray-100 text-gray-500 font-medium rounded-lg text-sm text-center">
+                          Closed
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
