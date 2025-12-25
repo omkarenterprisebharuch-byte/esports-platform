@@ -226,10 +226,7 @@ export default function DashboardLayout({
       {/* Desktop Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 p-4 hidden lg:flex flex-col">
         <div className="text-xl font-bold text-gray-900 mb-8 flex items-center gap-2">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          Esports
+          Esports Platform
         </div>
 
         <div className="bg-gray-50 rounded-lg p-3 mb-6 flex items-center gap-3">
@@ -316,10 +313,7 @@ export default function DashboardLayout({
             </svg>
           </button>
           <span className="font-bold text-gray-900 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            Esports
+            Esports Platform
           </span>
           <div className="w-10"></div>
         </header>

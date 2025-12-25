@@ -315,7 +315,7 @@ export default function TournamentDetailsPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
           <p className="text-sm text-gray-500">Prize Pool</p>
           <p className="text-2xl font-bold text-green-600">
@@ -340,6 +340,11 @@ export default function TournamentDetailsPage() {
             {tournament.tournament_type}
           </p>
         </div>
+      </div>
+
+      {/* Room Credentials Box - 5th stat */}
+      <div className="mb-6">
+        <LazyRoomCredentials tournamentId={tournament.id} isRegistered={isAlreadyRegistered} />
       </div>
 
       {/* Details */}
@@ -481,9 +486,6 @@ export default function TournamentDetailsPage() {
           <Link href="/my-registrations" className="text-blue-600 text-sm underline mt-2 inline-block">
             View My Registrations
           </Link>
-
-          {/* Room Credentials - Loaded on demand when user clicks */}
-          <LazyRoomCredentials tournamentId={tournament.id} isRegistered={isAlreadyRegistered} />
 
           {/* Chat Button - Opens chat on demand */}
           <div className="mt-4">
