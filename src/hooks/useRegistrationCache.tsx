@@ -1,7 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from "react";
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode, useRef } from "react";
 import { secureFetch, isAuthenticated } from "@/lib/api-client";
+import {
+  initRegistrationCache,
+  syncWithServer,
+  addToCache,
+  removeFromCache,
+  clearCache,
+  getMemoryCache,
+  needsRevalidation,
+  isCacheInitialized,
+  cleanupRegistrationCache,
+} from "@/lib/registration-cache-db";
 
 interface RegistrationCacheContextType {
   /** Set of tournament IDs the user is registered for */
@@ -20,65 +31,118 @@ interface RegistrationCacheContextType {
   removeRegistration: (tournamentId: number) => void;
 }
 
-// Module-level cache to persist across navigations
-let cachedRegisteredIds: Set<number> = new Set();
-let cacheTimestamp: number = 0;
-let cacheFetched: boolean = false;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
 const RegistrationCacheContext = createContext<RegistrationCacheContextType | undefined>(undefined);
+
+// Revalidation interval reference
+let revalidationTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Fetch registration IDs from server
+ */
+async function fetchRegistrationIdsFromServer(): Promise<number[]> {
+  const response = await secureFetch("/api/registrations/my-registrations?fields=tournament_id");
+  const data = await response.json();
+  
+  if (data.success) {
+    const registrations = data.data?.registrations || [];
+    return registrations.map((reg: { tournament_id: number }) => reg.tournament_id);
+  }
+  
+  return [];
+}
 
 /**
  * Provider that caches user's registered tournament IDs
- * This is a lightweight cache - only stores IDs, not full registration data
- * Use this to show "Already Registered" badges without fetching full registration data
+ * 
+ * Hybrid caching strategy:
+ * - Layer 1: IndexedDB (Persistent) - Survives refresh, shared across tabs
+ * - Layer 2: Memory Cache (Fast) - Instant access
+ * - Layer 3: Server validation - Periodic revalidation every 10 minutes
  */
 export function RegistrationCacheProvider({ children }: { children: ReactNode }) {
-  const [registeredIds, setRegisteredIds] = useState<Set<number>>(cachedRegisteredIds);
-  const [loading, setLoading] = useState(!cacheFetched);
-  const [fetched, setFetched] = useState(cacheFetched);
+  const [registeredIds, setRegisteredIds] = useState<Set<number>>(() => getMemoryCache());
+  const [loading, setLoading] = useState(!isCacheInitialized());
+  const [fetched, setFetched] = useState(isCacheInitialized());
+  const mountedRef = useRef(true);
+  const initRef = useRef(false);
 
-  const fetchRegistrationIds = useCallback(async (forceRefresh = false) => {
-    // Check if user is authenticated via cookie
-    if (!isAuthenticated()) {
-      setRegisteredIds(new Set());
-      setLoading(false);
-      setFetched(true);
-      return;
-    }
+  // Initialize cache on mount
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    async function init() {
+      // Prevent double initialization in StrictMode
+      if (initRef.current) return;
+      initRef.current = true;
 
-    // Use cache if valid and not forcing refresh
-    const now = Date.now();
-    if (!forceRefresh && cacheFetched && (now - cacheTimestamp) < CACHE_DURATION) {
-      setRegisteredIds(cachedRegisteredIds);
-      setLoading(false);
-      setFetched(true);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Use secureFetch which handles cookies automatically
-      const response = await secureFetch("/api/registrations/my-registrations?fields=tournament_id");
-      const data = await response.json();
-
-      if (data.success) {
-        const registrations = data.data?.registrations || [];
-        const ids = new Set<number>(
-          registrations.map((reg: { tournament_id: number }) => reg.tournament_id)
-        );
-        cachedRegisteredIds = ids;
-        cacheTimestamp = Date.now();
-        cacheFetched = true;
-        setRegisteredIds(ids);
+      if (!isAuthenticated()) {
+        setRegisteredIds(new Set());
+        setLoading(false);
+        setFetched(true);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to fetch registration IDs:", error);
-    } finally {
-      setLoading(false);
-      setFetched(true);
+
+      try {
+        // Initialize from IndexedDB (instant, no network)
+        const cachedIds = await initRegistrationCache((updatedIds) => {
+          // Callback for cross-tab updates
+          if (mountedRef.current) {
+            setRegisteredIds(updatedIds);
+          }
+        });
+
+        if (mountedRef.current) {
+          setRegisteredIds(cachedIds);
+          setLoading(false);
+          setFetched(true);
+        }
+
+        // Check if we need to sync with server
+        if (needsRevalidation()) {
+          // Sync in background (non-blocking)
+          syncWithServer(fetchRegistrationIdsFromServer).then((serverIds) => {
+            if (mountedRef.current) {
+              setRegisteredIds(serverIds);
+            }
+          });
+        }
+
+        // Set up periodic revalidation (every 10 minutes)
+        if (!revalidationTimer) {
+          revalidationTimer = setInterval(async () => {
+            if (isAuthenticated() && mountedRef.current) {
+              const serverIds = await syncWithServer(fetchRegistrationIdsFromServer);
+              if (mountedRef.current) {
+                setRegisteredIds(serverIds);
+              }
+            }
+          }, 10 * 60 * 1000);
+        }
+      } catch (error) {
+        console.error("Failed to initialize registration cache:", error);
+        if (mountedRef.current) {
+          setLoading(false);
+          setFetched(true);
+        }
+      }
     }
+
+    init();
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupRegistrationCache();
+      if (revalidationTimer) {
+        clearInterval(revalidationTimer);
+        revalidationTimer = null;
+      }
+    };
   }, []);
 
   const isRegistered = useCallback((tournamentId: number) => {
@@ -86,23 +150,43 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
   }, [registeredIds]);
 
   const addRegistration = useCallback((tournamentId: number) => {
-    const newIds = new Set(registeredIds);
-    newIds.add(tournamentId);
-    cachedRegisteredIds = newIds;
-    setRegisteredIds(newIds);
-  }, [registeredIds]);
+    // Optimistic update - instant UI feedback
+    setRegisteredIds((prev) => {
+      const newIds = new Set(prev);
+      newIds.add(tournamentId);
+      return newIds;
+    });
+    
+    // Persist to IndexedDB (async, non-blocking)
+    addToCache(tournamentId);
+  }, []);
 
   const removeRegistration = useCallback((tournamentId: number) => {
-    const newIds = new Set(registeredIds);
-    newIds.delete(tournamentId);
-    cachedRegisteredIds = newIds;
-    setRegisteredIds(newIds);
-  }, [registeredIds]);
+    // Optimistic update - instant UI feedback
+    setRegisteredIds((prev) => {
+      const newIds = new Set(prev);
+      newIds.delete(tournamentId);
+      return newIds;
+    });
+    
+    // Persist to IndexedDB (async, non-blocking)
+    removeFromCache(tournamentId);
+  }, []);
 
-  // Fetch on mount
-  useEffect(() => {
-    fetchRegistrationIds();
-  }, [fetchRegistrationIds]);
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated()) {
+      setRegisteredIds(new Set());
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const serverIds = await syncWithServer(fetchRegistrationIdsFromServer);
+      setRegisteredIds(serverIds);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return (
     <RegistrationCacheContext.Provider
@@ -111,7 +195,7 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
         loading,
         fetched,
         isRegistered,
-        refresh: () => fetchRegistrationIds(true),
+        refresh,
         addRegistration,
         removeRegistration,
       }}
@@ -135,9 +219,8 @@ export function useRegistrationCache() {
 
 /**
  * Clear the registration cache (call on logout)
+ * This clears both memory and IndexedDB cache
  */
-export function clearRegistrationCache() {
-  cachedRegisteredIds = new Set();
-  cacheTimestamp = 0;
-  cacheFetched = false;
+export async function clearRegistrationCache(): Promise<void> {
+  await clearCache();
 }

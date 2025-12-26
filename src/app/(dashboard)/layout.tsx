@@ -7,7 +7,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { LoaderProvider, Loader, NavigationLoader } from "@/components/ui/Loader";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { RegistrationCacheProvider } from "@/hooks/useRegistrationCache";
+import { RegistrationCacheProvider, clearRegistrationCache } from "@/hooks/useRegistrationCache";
 import { api, logout, isAuthenticated } from "@/lib/api-client";
 
 // Lazy load notification prompt - not critical for initial render
@@ -115,10 +115,12 @@ export default function DashboardLayout({
   }, [fetchUserData]);
 
   const handleLogout = async () => {
-    // Clear cache
+    // Clear all caches
     cachedUser = null;
     cachedTeamsCount = 0;
     cacheTimestamp = 0;
+    // Clear registration cache (IndexedDB + memory)
+    await clearRegistrationCache();
     // Use secure logout (clears httpOnly cookies server-side and redirects)
     await logout();
   };

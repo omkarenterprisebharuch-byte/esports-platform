@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, memo } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { ChatMessage } from "@/lib/socket-client";
 
@@ -13,6 +13,41 @@ interface TournamentChatRoomProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+// Memoized message component to prevent unnecessary re-renders
+const ChatMessageItem = memo(function ChatMessageItem({
+  msg,
+  isOwnMessage,
+  formatTime,
+}: {
+  msg: ChatMessage;
+  isOwnMessage: boolean;
+  formatTime: (timestamp: Date) => string;
+}) {
+  return (
+    <div className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+          isOwnMessage
+            ? "bg-gray-900 text-white rounded-br-md"
+            : "bg-white border border-gray-200 rounded-bl-md"
+        }`}
+      >
+        {!isOwnMessage && (
+          <p className="text-xs font-semibold text-gray-600 mb-1">
+            {msg.username}
+          </p>
+        )}
+        <p className={`text-sm ${isOwnMessage ? "text-white" : "text-gray-800"}`}>
+          {msg.message}
+        </p>
+        <p className={`text-xs mt-1 ${isOwnMessage ? "text-gray-400" : "text-gray-400"}`}>
+          {formatTime(msg.timestamp)}
+        </p>
+      </div>
+    </div>
+  );
+});
 
 export default function TournamentChatRoom({
   tournamentId,
@@ -29,17 +64,40 @@ export default function TournamentChatRoom({
     activeUserCount,
     error,
     isChatClosed,
+    hasMoreMessages,
+    isLoadingMore,
     connect,
     joinChat,
     leaveChat,
     send,
+    loadMoreMessages,
     clearError,
   } = useChat();
 
   const [inputMessage, setInputMessage] = useState("");
   const [hasJoined, setHasJoined] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesStartRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const prevMessageCountRef = useRef(0);
+
+  // Intersection observer for loading more messages when scrolling to top
+  useEffect(() => {
+    if (!messagesStartRef.current || !hasMoreMessages || isLoadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreMessages();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(messagesStartRef.current);
+    return () => observer.disconnect();
+  }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
   // Connect and join chat when modal opens
   useEffect(() => {
@@ -67,10 +125,17 @@ export default function TournamentChatRoom({
     }
   }, [isOpen, hasJoined, tournamentId, leaveChat]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive (not when loading older messages)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (messages.length > prevMessageCountRef.current) {
+      // Only scroll if we're adding new messages (not loading old ones at top)
+      const isNewMessage = prevMessageCountRef.current > 0;
+      if (isNewMessage) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
   // Focus input when chat opens
   useEffect(() => {
@@ -93,12 +158,12 @@ export default function TournamentChatRoom({
     }
   };
 
-  const formatTime = (timestamp: Date) => {
+  const formatTime = useCallback((timestamp: Date) => {
     return new Date(timestamp).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -160,48 +225,53 @@ export default function TournamentChatRoom({
 
         {/* Messages */}
         {!isChatClosed && (
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 min-h-[300px]">
-            {/* Chat Messages */}
-            {messages.length === 0 && !isChatClosed && (
-              <div className="text-center text-gray-500 py-8">
-                <span className="text-4xl block mb-2">👋</span>
-                <p>No messages yet. Be the first to say hello!</p>
+          <div 
+            ref={scrollContainerRef} 
+            className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 min-h-[300px]"
+          >
+            {/* Load more trigger at top */}
+            {hasMoreMessages && (
+              <div ref={messagesStartRef} className="flex justify-center py-2">
+                {isLoadingMore ? (
+                  <div className="flex items-center gap-2 text-gray-500 text-sm">
+                    <div className="animate-spin w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full"></div>
+                    Loading older messages...
+                  </div>
+                ) : (
+                  <button
+                    onClick={loadMoreMessages}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Load older messages
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {/* Empty state */}
+            {messages.length === 0 && (
+              <div className="flex items-center justify-center h-full text-center text-gray-500 py-8">
+                <div>
+                  <span className="text-4xl block mb-2">👋</span>
+                  <p>No messages yet. Be the first to say hello!</p>
+                </div>
               </div>
             )}
 
+            {/* Message list with memoized items */}
             {messages.map((msg: ChatMessage) => {
               const isOwnMessage = String(msg.userId) === String(currentUserId);
               return (
-                <div
+                <ChatMessageItem
                   key={msg.id}
-                  className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                      isOwnMessage
-                        ? "bg-gray-900 text-white rounded-br-md"
-                        : "bg-white border border-gray-200 rounded-bl-md"
-                    }`}
-                  >
-                    {!isOwnMessage && (
-                      <p className="text-xs font-semibold text-gray-600 mb-1">
-                        {msg.username}
-                      </p>
-                    )}
-                    <p className={`text-sm ${isOwnMessage ? "text-white" : "text-gray-800"}`}>
-                      {msg.message}
-                    </p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        isOwnMessage ? "text-gray-400" : "text-gray-400"
-                      }`}
-                    >
-                      {formatTime(msg.timestamp)}
-                    </p>
-                  </div>
-                </div>
+                  msg={msg}
+                  isOwnMessage={isOwnMessage}
+                  formatTime={formatTime}
+                />
               );
             })}
+            
+            {/* Scroll anchor */}
             <div ref={messagesEndRef} />
           </div>
         )}

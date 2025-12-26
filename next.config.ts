@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+// Bundle analyzer setup
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const nextConfig: NextConfig = {
   // Set output file tracing root to this directory to avoid lockfile detection issues
   outputFileTracingRoot: path.join(__dirname),
@@ -13,6 +18,17 @@ const nextConfig: NextConfig = {
 
   // Optimize production builds
   productionBrowserSourceMaps: false,
+
+  // Server-only packages - exclude from client bundle
+  serverExternalPackages: [
+    "cloudinary",
+    "web-push", 
+    "nodemailer",
+    "bcryptjs",
+    "jsonwebtoken",
+    "pg",
+    "sharp",
+  ],
 
   // Image optimization configuration
   images: {
@@ -45,8 +61,12 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "5mb",
     },
-    // Enable optimized package imports
-    optimizePackageImports: ["socket.io-client"],
+    // Enable optimized package imports for better tree-shaking
+    optimizePackageImports: [
+      "socket.io-client",
+      "zod",
+      "idb",
+    ],
   },
 
   // Allow mobile devices on the same network to access dev server
@@ -90,4 +110,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

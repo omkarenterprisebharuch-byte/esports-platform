@@ -3,6 +3,111 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { secureFetch, isAuthenticated } from "@/lib/api-client";
 
+// ============ Retry Logic ============
+
+export interface RetryConfig {
+  /** Maximum number of retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Base delay in milliseconds for exponential backoff (default: 1000) */
+  baseDelay?: number;
+  /** Maximum delay in milliseconds (default: 10000) */
+  maxDelay?: number;
+  /** Custom retry condition - return true to retry */
+  retryCondition?: (error: Error, attempt: number) => boolean;
+}
+
+/**
+ * Determine if an error is a network error (should retry)
+ * Only retry on network errors, not on 4xx client errors
+ */
+function isNetworkError(error: Error): boolean {
+  // Network failures
+  if (error.name === "TypeError" && error.message.includes("fetch")) {
+    return true;
+  }
+  // Connection errors
+  if (error.message.includes("network") || 
+      error.message.includes("Network") ||
+      error.message.includes("Failed to fetch") ||
+      error.message.includes("ECONNRESET") ||
+      error.message.includes("ETIMEDOUT") ||
+      error.message.includes("ENOTFOUND")) {
+    return true;
+  }
+  // Server errors (5xx) should retry
+  if (error.message.includes("500") || 
+      error.message.includes("502") || 
+      error.message.includes("503") || 
+      error.message.includes("504")) {
+    return true;
+  }
+  // Rate limiting - retry after delay
+  if (error.message.includes("429")) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Calculate exponential backoff delay with jitter
+ */
+function getBackoffDelay(attempt: number, baseDelay: number, maxDelay: number): number {
+  // Exponential backoff: 1s, 2s, 4s, 8s...
+  const exponentialDelay = baseDelay * Math.pow(2, attempt);
+  // Add jitter (±25%) to prevent thundering herd
+  const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1);
+  const delay = Math.min(exponentialDelay + jitter, maxDelay);
+  return Math.round(delay);
+}
+
+/**
+ * Execute a function with retry logic and exponential backoff
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  config: RetryConfig = {},
+  onRetry?: (attempt: number, delay: number, error: Error) => void
+): Promise<T> {
+  const {
+    maxRetries = 3,
+    baseDelay = 1000,
+    maxDelay = 10000,
+    retryCondition = isNetworkError,
+  } = config;
+
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Don't retry on abort
+      if (lastError.name === "AbortError") {
+        throw lastError;
+      }
+
+      // Check if we should retry
+      const isLastAttempt = attempt === maxRetries;
+      const shouldRetry = !isLastAttempt && retryCondition(lastError, attempt);
+
+      if (!shouldRetry) {
+        throw lastError;
+      }
+
+      // Calculate delay and wait
+      const delay = getBackoffDelay(attempt, baseDelay, maxDelay);
+      onRetry?.(attempt + 1, delay, lastError);
+      
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  // This should never be reached, but TypeScript needs it
+  throw lastError || new Error("Retry failed");
+}
+
 // ============ Types ============
 
 interface UseApiState<T> {
@@ -11,6 +116,10 @@ interface UseApiState<T> {
   isLoading: boolean;
   isSuccess: boolean;
   isError: boolean;
+  /** Current retry attempt (0 if not retrying) */
+  retryAttempt: number;
+  /** Whether currently retrying a failed request */
+  isRetrying: boolean;
 }
 
 interface UseApiOptions<T> {
@@ -30,6 +139,10 @@ interface UseApiOptions<T> {
   onError?: (error: string) => void;
   /** Require authentication */
   requireAuth?: boolean;
+  /** Retry configuration */
+  retry?: RetryConfig | boolean;
+  /** Callback when retrying */
+  onRetry?: (attempt: number, delay: number, error: Error) => void;
 }
 
 interface UseApiReturn<T> extends UseApiState<T> {
@@ -49,6 +162,10 @@ interface UseMutationState<T> {
   isLoading: boolean;
   isSuccess: boolean;
   isError: boolean;
+  /** Current retry attempt (0 if not retrying) */
+  retryAttempt: number;
+  /** Whether currently retrying a failed request */
+  isRetrying: boolean;
 }
 
 interface UseMutationOptions<T, V> {
@@ -60,6 +177,10 @@ interface UseMutationOptions<T, V> {
   optimisticUpdate?: (variables: V) => T;
   /** Rollback function for failed optimistic updates */
   rollback?: () => void;
+  /** Retry configuration */
+  retry?: RetryConfig | boolean;
+  /** Callback when retrying */
+  onRetry?: (attempt: number, delay: number, error: Error) => void;
 }
 
 // ============ Simple Cache ============
@@ -112,7 +233,16 @@ export function useApi<T>(
     onSuccess,
     onError,
     requireAuth = false,
+    retry = false,
+    onRetry,
   } = options;
+
+  // Normalize retry config
+  const retryConfig: RetryConfig | null = retry === true 
+    ? {} // Use defaults
+    : retry === false 
+      ? null 
+      : retry;
 
   const [state, setState] = useState<UseApiState<T>>({
     data: initialData,
@@ -120,6 +250,8 @@ export function useApi<T>(
     isLoading: immediate,
     isSuccess: false,
     isError: false,
+    retryAttempt: 0,
+    isRetrying: false,
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -134,6 +266,8 @@ export function useApi<T>(
         error: errorMsg,
         isLoading: false,
         isError: true,
+        retryAttempt: 0,
+        isRetrying: false,
       }));
       onError?.(errorMsg);
       return null;
@@ -149,6 +283,8 @@ export function useApi<T>(
         isLoading: false,
         isSuccess: true,
         isError: false,
+        retryAttempt: 0,
+        isRetrying: false,
       });
       onSuccess?.(cached);
       return cached;
@@ -158,14 +294,19 @@ export function useApi<T>(
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    setState((prev) => ({ 
+      ...prev, 
+      isLoading: true, 
+      error: null,
+      retryAttempt: 0,
+      isRetrying: false,
+    }));
 
-    try {
+    // The actual fetch function
+    const doFetch = async (): Promise<T> => {
       const response = await secureFetch(url, {
-        signal: abortControllerRef.current.signal,
+        signal: abortControllerRef.current!.signal,
       });
-
-      if (!mountedRef.current) return null;
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -179,6 +320,33 @@ export function useApi<T>(
         data = transform(data);
       }
 
+      return data;
+    };
+
+    // Retry callback to update UI
+    const handleRetry = (attempt: number, delay: number, error: Error) => {
+      if (!mountedRef.current) return;
+      setState((prev) => ({
+        ...prev,
+        retryAttempt: attempt,
+        isRetrying: true,
+      }));
+      onRetry?.(attempt, delay, error);
+    };
+
+    try {
+      let data: T;
+
+      if (retryConfig) {
+        // Use retry logic
+        data = await withRetry(doFetch, retryConfig, handleRetry);
+      } else {
+        // No retry
+        data = await doFetch();
+      }
+
+      if (!mountedRef.current) return null;
+
       // Cache the result
       setCache(effectiveCacheKey, data);
 
@@ -188,6 +356,8 @@ export function useApi<T>(
         isLoading: false,
         isSuccess: true,
         isError: false,
+        retryAttempt: 0,
+        isRetrying: false,
       });
 
       onSuccess?.(data);
@@ -207,12 +377,14 @@ export function useApi<T>(
         isLoading: false,
         isSuccess: false,
         isError: true,
+        retryAttempt: 0,
+        isRetrying: false,
       });
 
       onError?.(errorMsg);
       return null;
     }
-  }, [url, cacheKey, cacheTTL, transform, onSuccess, onError, requireAuth]);
+  }, [url, cacheKey, cacheTTL, transform, onSuccess, onError, requireAuth, retryConfig, onRetry]);
 
   const reset = useCallback(() => {
     abortControllerRef.current?.abort();
@@ -222,6 +394,8 @@ export function useApi<T>(
       isLoading: false,
       isSuccess: false,
       isError: false,
+      retryAttempt: 0,
+      isRetrying: false,
     });
   }, [initialData]);
 
@@ -277,7 +451,21 @@ export function useMutation<T, V = void>(
   mutate: (variables: V) => Promise<T | null>;
   reset: () => void;
 } & UseMutationState<T> {
-  const { onSuccess, onError, optimisticUpdate, rollback } = options;
+  const { 
+    onSuccess, 
+    onError, 
+    optimisticUpdate, 
+    rollback,
+    retry = false,
+    onRetry,
+  } = options;
+
+  // Normalize retry config
+  const retryConfig: RetryConfig | null = retry === true 
+    ? {} // Use defaults
+    : retry === false 
+      ? null 
+      : retry;
 
   const [state, setState] = useState<UseMutationState<T>>({
     data: null,
@@ -285,6 +473,8 @@ export function useMutation<T, V = void>(
     isLoading: false,
     isSuccess: false,
     isError: false,
+    retryAttempt: 0,
+    isRetrying: false,
   });
 
   const mutate = useCallback(
@@ -295,6 +485,8 @@ export function useMutation<T, V = void>(
         isLoading: true,
         isSuccess: false,
         isError: false,
+        retryAttempt: 0,
+        isRetrying: false,
       });
 
       // Apply optimistic update
@@ -304,7 +496,8 @@ export function useMutation<T, V = void>(
         setState((prev) => ({ ...prev, data: optimisticData! }));
       }
 
-      try {
+      // The actual mutation function
+      const doMutation = async (): Promise<T> => {
         const response = await mutationFn(variables);
 
         if (!response.ok) {
@@ -313,7 +506,29 @@ export function useMutation<T, V = void>(
         }
 
         const json = await response.json();
-        const data = (json.data ?? json) as T;
+        return (json.data ?? json) as T;
+      };
+
+      // Retry callback to update UI
+      const handleRetry = (attempt: number, delay: number, error: Error) => {
+        setState((prev) => ({
+          ...prev,
+          retryAttempt: attempt,
+          isRetrying: true,
+        }));
+        onRetry?.(attempt, delay, error);
+      };
+
+      try {
+        let data: T;
+
+        if (retryConfig) {
+          // Use retry logic
+          data = await withRetry(doMutation, retryConfig, handleRetry);
+        } else {
+          // No retry
+          data = await doMutation();
+        }
 
         setState({
           data,
@@ -321,6 +536,8 @@ export function useMutation<T, V = void>(
           isLoading: false,
           isSuccess: true,
           isError: false,
+          retryAttempt: 0,
+          isRetrying: false,
         });
 
         onSuccess?.(data, variables);
@@ -338,13 +555,15 @@ export function useMutation<T, V = void>(
           isLoading: false,
           isSuccess: false,
           isError: true,
+          retryAttempt: 0,
+          isRetrying: false,
         });
 
         onError?.(errorMsg, variables);
         return null;
       }
     },
-    [mutationFn, onSuccess, onError, optimisticUpdate, rollback]
+    [mutationFn, onSuccess, onError, optimisticUpdate, rollback, retryConfig, onRetry]
   );
 
   const reset = useCallback(() => {
@@ -354,6 +573,8 @@ export function useMutation<T, V = void>(
       isLoading: false,
       isSuccess: false,
       isError: false,
+      retryAttempt: 0,
+      isRetrying: false,
     });
   }, []);
 
