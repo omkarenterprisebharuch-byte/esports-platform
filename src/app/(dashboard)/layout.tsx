@@ -54,6 +54,7 @@ export default function DashboardLayout({
   const fetchUserData = useCallback(async (forceRefresh = false) => {
     // Check if user is authenticated via cookie
     if (!isAuthenticated()) {
+      setInitialLoading(false);
       router.push("/login");
       return;
     }

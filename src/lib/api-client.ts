@@ -121,10 +121,13 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Check if user is authenticated (has auth cookie)
+ * Check if user is authenticated (has csrf cookie set alongside auth)
  * Note: This is a client-side check only, server validates the actual token
+ * We check for csrf_token because auth_token is httpOnly (not accessible via JS)
  */
 export function isAuthenticated(): boolean {
   if (typeof document === "undefined") return false;
-  return document.cookie.includes("auth_token=");
+  // Check for csrf_token which is set alongside auth_token during login
+  // and is readable by JavaScript (httpOnly: false)
+  return document.cookie.includes("csrf_token=");
 }
