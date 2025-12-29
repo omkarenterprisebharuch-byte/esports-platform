@@ -79,12 +79,21 @@ export function errorResponse(
 }
 
 /**
- * Unauthorized response
+ * Unauthorized response (401)
  */
 export function unauthorizedResponse(
   message: string = "Unauthorized"
 ): NextResponse<ApiResponse> {
   return errorResponse(message, 401);
+}
+
+/**
+ * Forbidden response (403) - Authenticated but not authorized
+ */
+export function forbiddenResponse(
+  message: string = "Forbidden"
+): NextResponse<ApiResponse> {
+  return errorResponse(message, 403);
 }
 
 /**

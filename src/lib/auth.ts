@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { cookies } from "next/headers";
 import crypto from "crypto";
+import { UserRole } from "@/types";
 
 // SECURITY: JWT_SECRET must be set in environment - no fallback allowed
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -12,11 +13,57 @@ if (!JWT_SECRET) {
 // CSRF token secret for generating tokens
 const CSRF_SECRET = process.env.CSRF_SECRET || crypto.randomBytes(32).toString("hex");
 
+// Token expiration times
+export const ACCESS_TOKEN_EXPIRY = "15m";  // 15 minutes
+export const REFRESH_TOKEN_EXPIRY_DAYS = 7; // 7 days
+export const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+
 export interface TokenPayload {
-  id: number;
+  id: string; // UUID
   email: string;
   username: string;
   is_host: boolean;
+  role: UserRole; // RBAC role
+}
+
+export interface RefreshTokenPayload {
+  id: string; // UUID - user id
+  tokenId: string; // UUID - refresh token id for revocation
+  type: "refresh";
+}
+
+// ============ Role-based Access Control ============
+
+/**
+ * Permission matrix for RBAC
+ */
+export const ROLE_PERMISSIONS = {
+  player: ["view_tournaments", "register_tournament", "manage_profile", "view_teams"],
+  organizer: ["view_tournaments", "register_tournament", "manage_profile", "view_teams", "create_tournament", "manage_own_tournaments", "view_registrations"],
+  owner: ["view_tournaments", "register_tournament", "manage_profile", "view_teams", "create_tournament", "manage_own_tournaments", "view_registrations", "manage_all_users", "assign_roles", "view_all_tournaments", "platform_settings", "view_analytics"],
+} as const;
+
+export type Permission = (typeof ROLE_PERMISSIONS)[keyof typeof ROLE_PERMISSIONS][number];
+
+/**
+ * Check if a role has a specific permission
+ */
+export function hasPermission(role: UserRole, permission: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(permission as never) || false;
+}
+
+/**
+ * Check if user has organizer or owner role
+ */
+export function isOrganizer(role: UserRole): boolean {
+  return role === "organizer" || role === "owner";
+}
+
+/**
+ * Check if user is platform owner
+ */
+export function isOwner(role: UserRole): boolean {
+  return role === "owner";
 }
 
 /**
@@ -36,14 +83,17 @@ export async function verifyPassword(
   return bcrypt.compare(password, hash);
 }
 
+// ============ Access Token Functions ============
+
 /**
- * Generate JWT token
+ * Generate short-lived access token (15 minutes)
  */
-export function generateToken(user: {
-  id: number;
+export function generateAccessToken(user: {
+  id: string;
   email: string;
   username: string;
   is_host?: boolean;
+  role?: UserRole;
 }): string {
   return jwt.sign(
     {
@@ -51,22 +101,76 @@ export function generateToken(user: {
       email: user.email,
       username: user.username,
       is_host: user.is_host || false,
+      role: user.role || "player",
     },
     JWT_SECRET!,
-    { expiresIn: "7d" }
+    { expiresIn: ACCESS_TOKEN_EXPIRY }
   );
 }
 
 /**
- * Verify JWT token
+ * Generate JWT token (legacy - uses access token internally)
+ * @deprecated Use generateAccessToken instead
  */
-export function verifyToken(token: string): TokenPayload | null {
+export function generateToken(user: {
+  id: string | number;
+  email: string;
+  username: string;
+  is_host?: boolean;
+  role?: UserRole;
+}): string {
+  return generateAccessToken({
+    id: String(user.id),
+    email: user.email,
+    username: user.username,
+    is_host: user.is_host,
+    role: user.role,
+  });
+}
+
+/**
+ * Verify access token
+ */
+export function verifyAccessToken(token: string): TokenPayload | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET!) as JwtPayload & TokenPayload;
     return decoded;
   } catch {
     return null;
   }
+}
+
+/**
+ * Verify JWT token (legacy - uses verifyAccessToken internally)
+ */
+export function verifyToken(token: string): TokenPayload | null {
+  return verifyAccessToken(token);
+}
+
+// ============ Refresh Token Functions ============
+
+/**
+ * Generate a cryptographically secure refresh token
+ * Returns: { token: raw token to send to client, hash: hash to store in DB }
+ */
+export function generateRefreshToken(): { token: string; hash: string } {
+  const token = crypto.randomBytes(32).toString("hex");
+  const hash = hashToken(token);
+  return { token, hash };
+}
+
+/**
+ * Hash a token using SHA-256 (for storing refresh tokens securely)
+ */
+export function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Generate refresh token expiry date
+ */
+export function getRefreshTokenExpiry(): Date {
+  return new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 }
 
 /**
@@ -122,7 +226,7 @@ export function getUserFromHeader(
 /**
  * Generate a CSRF token for a user session
  */
-export function generateCsrfToken(userId: number): string {
+export function generateCsrfToken(userId: string | number): string {
   const timestamp = Date.now();
   const data = `${userId}:${timestamp}`;
   const signature = crypto
@@ -136,13 +240,13 @@ export function generateCsrfToken(userId: number): string {
  * Verify a CSRF token
  * Token is valid for 24 hours
  */
-export function verifyCsrfToken(token: string, userId: number): boolean {
+export function verifyCsrfToken(token: string, userId: string | number): boolean {
   try {
     const decoded = Buffer.from(token, "base64").toString("utf-8");
     const [tokenUserId, timestamp, signature] = decoded.split(":");
     
-    // Check user ID matches
-    if (parseInt(tokenUserId) !== userId) {
+    // Check user ID matches (compare as strings)
+    if (tokenUserId !== String(userId)) {
       return false;
     }
 
@@ -167,8 +271,47 @@ export function verifyCsrfToken(token: string, userId: number): boolean {
   }
 }
 
+// ============ Role-based Route Protection ============
+
 /**
- * Cookie configuration for auth token
+ * Require a specific role for API route access
+ * Returns the user if authorized, null if not
+ */
+export function requireRole(
+  request: { cookies: { get: (name: string) => { value: string } | undefined }; headers: { get: (name: string) => string | null } },
+  requiredRoles: UserRole[]
+): TokenPayload | null {
+  const user = getUserFromRequest(request);
+  if (!user) return null;
+  
+  // Check if user's role is in the required roles
+  // Default to 'player' if no role in token (backwards compatibility)
+  const userRole = user.role || "player";
+  if (!requiredRoles.includes(userRole)) return null;
+  
+  return user;
+}
+
+/**
+ * Require organizer or owner role
+ */
+export function requireOrganizer(
+  request: { cookies: { get: (name: string) => { value: string } | undefined }; headers: { get: (name: string) => string | null } }
+): TokenPayload | null {
+  return requireRole(request, ["organizer", "owner"]);
+}
+
+/**
+ * Require owner role
+ */
+export function requireOwner(
+  request: { cookies: { get: (name: string) => { value: string } | undefined }; headers: { get: (name: string) => string | null } }
+): TokenPayload | null {
+  return requireRole(request, ["owner"]);
+}
+
+/**
+ * Cookie configuration for access token (short-lived, httpOnly)
  */
 export const AUTH_COOKIE_OPTIONS = {
   name: "auth_token",
@@ -176,7 +319,19 @@ export const AUTH_COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
   path: "/",
-  maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+  maxAge: 15 * 60, // 15 minutes in seconds (matches ACCESS_TOKEN_EXPIRY)
+};
+
+/**
+ * Cookie configuration for refresh token (long-lived, httpOnly, secure)
+ */
+export const REFRESH_COOKIE_OPTIONS = {
+  name: "refresh_token",
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60, // 7 days in seconds
 };
 
 /**

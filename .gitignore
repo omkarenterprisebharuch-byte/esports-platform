@@ -11,6 +11,7 @@ coverage
 out/
 build
 .next
+
 # Production
 dist
 
@@ -52,3 +53,23 @@ logs
 # Cache
 .cache
 .eslintcache
+
+# Playwright
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# OS files
+Desktop.ini
+.Spotlight-V100
+.Trashes
+
+# Package manager locks (keep one, ignore others if not using)
+# yarn.lock
+# pnpm-lock.yaml
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+tmp/

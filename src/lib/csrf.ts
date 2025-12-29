@@ -49,6 +49,8 @@ export function validateCsrf(request: NextRequest) {
  */
 export const CSRF_EXEMPT_PATHS = [
   "/api/auth/login",
+  "/api/auth/logout",
+  "/api/auth/refresh",
   "/api/auth/send-otp",
   "/api/auth/verify-otp",
   "/api/auth/forgot-password",

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // Get user for hosted filter
-    let userId: number | null = null;
+    let userId: string | null = null;
     if (hosted === "true") {
       const user = getUserFromRequest(request);
       if (!user) {

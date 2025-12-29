@@ -1,5 +1,8 @@
 // Database types matching your PostgreSQL schema
 
+// User roles for RBAC
+export type UserRole = "player" | "organizer" | "owner";
+
 export interface User {
   id: number; // SERIAL PRIMARY KEY (integer)
   username: string;
@@ -13,6 +16,7 @@ export interface User {
   is_host: boolean;
   is_verified: boolean;
   is_active: boolean;
+  role: UserRole; // RBAC role
   auth_provider: "local" | "google" | "facebook" | "discord";
   auth_provider_id?: string;
   last_login_at?: Date;
@@ -20,6 +24,8 @@ export interface User {
   updated_at: Date;
   // Frontend compatibility alias
   avatar_url?: string;
+  // Computed field for backward compatibility
+  is_admin?: boolean;
 }
 
 export interface Team {

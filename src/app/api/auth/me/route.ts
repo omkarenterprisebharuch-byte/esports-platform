@@ -9,7 +9,7 @@ import {
 
 /**
  * GET /api/auth/me
- * Get current user info
+ * Get current user info including role
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
     }
 
     const result = await pool.query(
-      "SELECT id, username, email, full_name, phone_number, is_host, is_verified, profile_picture_url, in_game_ids, wallet_balance FROM users WHERE id = $1",
+      `SELECT id, username, email, full_name, phone_number, is_host, is_verified, 
+              profile_picture_url, in_game_ids, wallet_balance, 
+              COALESCE(role, 'player') as role 
+       FROM users WHERE id = $1`,
       [tokenUser.id]
     );
 
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
     return successResponse({
       ...user,
       avatar_url: user.profile_picture_url, // alias for frontend compatibility
-      is_admin: user.username === "admin", // simulate is_admin based on username
+      is_admin: user.role === "owner", // is_admin = true if owner role
     });
   } catch (error) {
     console.error("Get me error:", error);
