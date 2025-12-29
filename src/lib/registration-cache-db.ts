@@ -13,9 +13,9 @@ import { openDB, DBSchema, IDBPDatabase } from "idb";
 // Database schema
 interface RegistrationCacheDB extends DBSchema {
   registrations: {
-    key: number;
+    key: string;
     value: {
-      tournamentId: number;
+      tournamentId: string;
       registeredAt: number;
     };
   };
@@ -30,12 +30,12 @@ interface RegistrationCacheDB extends DBSchema {
 
 // Constants
 const DB_NAME = "esports-registration-cache";
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented to force fresh DB with string IDs
 const REVALIDATION_INTERVAL = 10 * 60 * 1000; // 10 minutes
 const BROADCAST_CHANNEL_NAME = "registration-cache-sync";
 
 // Memory cache (Layer 2)
-let memoryCache: Set<number> = new Set();
+let memoryCache: Set<string> = new Set();
 let memoryCacheTimestamp = 0;
 let isInitialized = false;
 
@@ -83,7 +83,7 @@ function getDB(): Promise<IDBPDatabase<RegistrationCacheDB>> {
 /**
  * Initialize BroadcastChannel for cross-tab synchronization
  */
-function initBroadcastChannel(onUpdate: (ids: Set<number>) => void): void {
+function initBroadcastChannel(onUpdate: (ids: Set<string>) => void): void {
   if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
   
   if (broadcastChannel) {
@@ -138,7 +138,7 @@ function broadcast(type: string, data?: Record<string, unknown>): void {
 /**
  * Load registration IDs from IndexedDB into memory cache
  */
-export async function loadFromIndexedDB(): Promise<Set<number>> {
+export async function loadFromIndexedDB(): Promise<Set<string>> {
   try {
     const db = await getDB();
     const registrations = await db.getAll("registrations");
@@ -163,7 +163,7 @@ export async function loadFromIndexedDB(): Promise<Set<number>> {
 /**
  * Save registration IDs to IndexedDB
  */
-export async function saveToIndexedDB(ids: Set<number>): Promise<void> {
+export async function saveToIndexedDB(ids: Set<string>): Promise<void> {
   try {
     const db = await getDB();
     const tx = db.transaction(["registrations", "metadata"], "readwrite");
@@ -193,7 +193,7 @@ export async function saveToIndexedDB(ids: Set<number>): Promise<void> {
 /**
  * Add a single registration to the cache
  */
-export async function addToCache(tournamentId: number): Promise<void> {
+export async function addToCache(tournamentId: string): Promise<void> {
   memoryCache.add(tournamentId);
   
   try {
@@ -208,7 +208,7 @@ export async function addToCache(tournamentId: number): Promise<void> {
 /**
  * Remove a single registration from the cache
  */
-export async function removeFromCache(tournamentId: number): Promise<void> {
+export async function removeFromCache(tournamentId: string): Promise<void> {
   memoryCache.delete(tournamentId);
   
   try {
@@ -242,7 +242,7 @@ export async function clearCache(): Promise<void> {
 /**
  * Get memory cache (fast, synchronous access)
  */
-export function getMemoryCache(): Set<number> {
+export function getMemoryCache(): Set<string> {
   return new Set(memoryCache);
 }
 
@@ -273,8 +273,8 @@ export function getLastSyncTime(): number {
  * Call this on app mount
  */
 export async function initRegistrationCache(
-  onUpdate: (ids: Set<number>) => void
-): Promise<Set<number>> {
+  onUpdate: (ids: Set<string>) => void
+): Promise<Set<string>> {
   // Initialize BroadcastChannel for cross-tab sync
   initBroadcastChannel(onUpdate);
   
@@ -289,8 +289,8 @@ export async function initRegistrationCache(
  * Returns the updated set of registration IDs
  */
 export async function syncWithServer(
-  fetchFn: () => Promise<number[]>
-): Promise<Set<number>> {
+  fetchFn: () => Promise<string[]>
+): Promise<Set<string>> {
   try {
     const serverIds = await fetchFn();
     const ids = new Set(serverIds);

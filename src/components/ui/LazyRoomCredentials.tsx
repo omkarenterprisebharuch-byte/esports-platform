@@ -83,8 +83,8 @@ export function LazyRoomCredentials({ tournamentId, isRegistered }: LazyRoomCred
   if (data && data.room_id) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-green-700">🎮 Room Credentials</p>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm text-gray-500">🎮 Room</p>
           <button
             onClick={hide}
             className="text-green-600 text-xs hover:underline"
@@ -93,52 +93,42 @@ export function LazyRoomCredentials({ tournamentId, isRegistered }: LazyRoomCred
           </button>
         </div>
         
-        {/* Room ID with Copy */}
-        <div className="space-y-2">
-          <div className="bg-white rounded-lg p-2 border border-green-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-green-600">Room ID</p>
-                <p className="font-mono font-bold text-gray-900">{data.room_id}</p>
-              </div>
+        {/* Compact Room ID with Copy */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-1">
+            <p className="font-mono text-sm font-bold text-gray-900 truncate">{data.room_id}</p>
+            <button
+              onClick={() => copyToClipboard(data.room_id!, "id")}
+              className="p-1 hover:bg-green-100 rounded transition flex-shrink-0"
+              title="Copy Room ID"
+            >
+              {copiedField === "id" ? (
+                <span className="text-green-600 text-xs">✓</span>
+              ) : (
+                <svg className="w-3.5 h-3.5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Compact Password with Copy */}
+          {data.room_password && (
+            <div className="flex items-center justify-between gap-1">
+              <p className="font-mono text-sm font-bold text-gray-900 truncate">{data.room_password}</p>
               <button
-                onClick={() => copyToClipboard(data.room_id!, "id")}
-                className="p-2 hover:bg-green-100 rounded-lg transition"
-                title="Copy Room ID"
+                onClick={() => copyToClipboard(data.room_password!, "password")}
+                className="p-1 hover:bg-green-100 rounded transition flex-shrink-0"
+                title="Copy Password"
               >
-                {copiedField === "id" ? (
-                  <span className="text-green-600 text-sm">✓</span>
+                {copiedField === "password" ? (
+                  <span className="text-green-600 text-xs">✓</span>
                 ) : (
-                  <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3.5 h-3.5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                 )}
               </button>
-            </div>
-          </div>
-
-          {/* Password with Copy */}
-          {data.room_password && (
-            <div className="bg-white rounded-lg p-2 border border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-green-600">Password</p>
-                  <p className="font-mono font-bold text-gray-900">{data.room_password}</p>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(data.room_password!, "password")}
-                  className="p-2 hover:bg-green-100 rounded-lg transition"
-                  title="Copy Password"
-                >
-                  {copiedField === "password" ? (
-                    <span className="text-green-600 text-sm">✓</span>
-                  ) : (
-                    <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
             </div>
           )}
         </div>

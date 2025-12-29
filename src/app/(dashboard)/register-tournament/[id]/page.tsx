@@ -15,9 +15,10 @@ export default function RegisterTournamentPage() {
   const params = useParams();
   const router = useRouter();
   
-  // Use cached registration data
+  // Use cached registration data - use string ID directly (tournament IDs are UUIDs)
   const { isRegistered, addRegistration } = useRegistrationCache();
-  const isAlreadyRegistered = isRegistered(Number(params.id));
+  const tournamentId = params.id as string;
+  const isAlreadyRegistered = isRegistered(tournamentId);
   
   const [tournament, setTournament] = useState<TournamentWithHost | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -79,7 +80,8 @@ export default function RegisterTournamentPage() {
   // Handle team selection
   const handleTeamSelect = (teamId: number) => {
     setSelectedTeamId(teamId);
-    if (tournament?.tournament_type === "squad") {
+    // Fetch members for both duo and squad to allow player selection
+    if (tournament?.tournament_type === "squad" || tournament?.tournament_type === "duo") {
       fetchTeamMembers(teamId);
     }
   };
@@ -175,23 +177,23 @@ export default function RegisterTournamentPage() {
     if (!tournament) return "";
     switch (tournament.tournament_type) {
       case "duo":
-        return "at least 2 members";
+        return "at least 2 members (you will select 2 to play)";
       case "squad":
-        return "4-5 members (4 players + 1 optional backup)";
+        return "at least 4 members (you will select 4 to play)";
       default:
         return "";
     }
   };
 
   const getRequiredMemberCount = () => {
-    if (!tournament) return { min: 0, max: 0 };
+    if (!tournament) return { min: 0, max: Infinity };
     switch (tournament.tournament_type) {
       case "duo":
-        return { min: 2, max: 2 };
+        return { min: 2, max: Infinity }; // At least 2 members, can have more
       case "squad":
-        return { min: 4, max: 5 }; // 4 required + 1 optional backup
+        return { min: 4, max: Infinity }; // At least 4 members, can have more
       default:
-        return { min: 0, max: 0 };
+        return { min: 0, max: Infinity };
     }
   };
 
@@ -199,10 +201,10 @@ export default function RegisterTournamentPage() {
     if (!tournament) return false;
 
     const memberCount = team.member_count || team.total_members || 0;
-    const { min, max } = getRequiredMemberCount();
+    const { min } = getRequiredMemberCount();
 
-    // Team must have between min and max members
-    return memberCount >= min && memberCount <= max;
+    // Team must have at least the minimum required members
+    return memberCount >= min;
   };
 
   if (loading) {
@@ -305,7 +307,8 @@ export default function RegisterTournamentPage() {
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-amber-700">
               ⚠️ <strong>Requirement:</strong> Your team must have {getTeamSizeRequirement()} to participate in this {tournament.tournament_type} tournament.
-              {tournament.tournament_type === "squad" && " You will select 4 players to compete, and the 5th member (if any) will be the backup."}
+              {tournament.tournament_type === "duo" && " You will select 2 players to compete, others will be backups."}
+              {tournament.tournament_type === "squad" && " You will select 4 players to compete, others will be backups."}
             </p>
           </div>
 
@@ -341,7 +344,7 @@ export default function RegisterTournamentPage() {
                       <div>
                         <p className="font-medium text-gray-900">{team.team_name}</p>
                         <p className="text-sm text-gray-500">
-                          {memberCount} member(s) {eligible ? "✓" : `(Need ${getRequiredMemberCount().min}-${getRequiredMemberCount().max})`}
+                          {memberCount} member(s) {eligible ? "✓" : `(Need at least ${getRequiredMemberCount().min})`}
                         </p>
                       </div>
 
@@ -351,7 +354,7 @@ export default function RegisterTournamentPage() {
 
                       {!eligible && (
                         <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
-                          Needs {getRequiredMemberCount().min}-{getRequiredMemberCount().max} members
+                          Needs at least {getRequiredMemberCount().min} members
                         </span>
                       )}
                     </div>
@@ -457,9 +460,9 @@ export default function RegisterTournamentPage() {
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-600">
                   Selected: <span className="font-medium">{selectedPlayers.length}</span> / {tournament.tournament_type === "squad" ? 4 : 2} players
-                  {tournament.tournament_type === "squad" && teamMembers.length > 4 && (
+                  {teamMembers.length > (tournament.tournament_type === "squad" ? 4 : 2) && selectedPlayers.length > 0 && (
                     <span className="ml-2 text-amber-600">
-                      ({teamMembers.length - selectedPlayers.length} backup)
+                      ({teamMembers.length - selectedPlayers.length} backup{teamMembers.length - selectedPlayers.length !== 1 ? 's' : ''})
                     </span>
                   )}
                 </p>

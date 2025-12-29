@@ -16,19 +16,19 @@ import {
 
 interface RegistrationCacheContextType {
   /** Set of tournament IDs the user is registered for */
-  registeredIds: Set<number>;
+  registeredIds: Set<string>;
   /** Whether the cache is currently loading */
   loading: boolean;
   /** Whether the cache has been fetched at least once */
   fetched: boolean;
   /** Check if user is registered for a specific tournament */
-  isRegistered: (tournamentId: number) => boolean;
+  isRegistered: (tournamentId: string | number) => boolean;
   /** Force refresh the registration cache */
   refresh: () => Promise<void>;
   /** Add a tournament ID to the cache (after successful registration) */
-  addRegistration: (tournamentId: number) => void;
+  addRegistration: (tournamentId: string | number) => void;
   /** Remove a tournament ID from the cache (after cancellation) */
-  removeRegistration: (tournamentId: number) => void;
+  removeRegistration: (tournamentId: string | number) => void;
 }
 
 const RegistrationCacheContext = createContext<RegistrationCacheContextType | undefined>(undefined);
@@ -39,13 +39,13 @@ let revalidationTimer: ReturnType<typeof setInterval> | null = null;
 /**
  * Fetch registration IDs from server
  */
-async function fetchRegistrationIdsFromServer(): Promise<number[]> {
+async function fetchRegistrationIdsFromServer(): Promise<string[]> {
   const response = await secureFetch("/api/registrations/my-registrations?fields=tournament_id");
   const data = await response.json();
   
   if (data.success) {
     const registrations = data.data?.registrations || [];
-    return registrations.map((reg: { tournament_id: number }) => reg.tournament_id);
+    return registrations.map((reg: { tournament_id: string }) => String(reg.tournament_id));
   }
   
   return [];
@@ -60,7 +60,7 @@ async function fetchRegistrationIdsFromServer(): Promise<number[]> {
  * - Layer 3: Server validation - Periodic revalidation every 10 minutes
  */
 export function RegistrationCacheProvider({ children }: { children: ReactNode }) {
-  const [registeredIds, setRegisteredIds] = useState<Set<number>>(() => getMemoryCache());
+  const [registeredIds, setRegisteredIds] = useState<Set<string>>(() => getMemoryCache());
   const [loading, setLoading] = useState(!isCacheInitialized());
   const [fetched, setFetched] = useState(isCacheInitialized());
   const mountedRef = useRef(true);
@@ -93,11 +93,11 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
           }
         });
         
-        const timeoutPromise = new Promise<Set<number>>((_, reject) => 
+        const timeoutPromise = new Promise<Set<string>>((_, reject) => 
           setTimeout(() => reject(new Error('IndexedDB timeout')), INIT_TIMEOUT)
         );
         
-        let cachedIds: Set<number>;
+        let cachedIds: Set<string>;
         try {
           cachedIds = await Promise.race([initPromise, timeoutPromise]);
         } catch (timeoutError) {
@@ -159,32 +159,34 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
     };
   }, []);
 
-  const isRegistered = useCallback((tournamentId: number) => {
-    return registeredIds.has(tournamentId);
+  const isRegistered = useCallback((tournamentId: string | number) => {
+    return registeredIds.has(String(tournamentId));
   }, [registeredIds]);
 
-  const addRegistration = useCallback((tournamentId: number) => {
+  const addRegistration = useCallback((tournamentId: string | number) => {
+    const id = String(tournamentId);
     // Optimistic update - instant UI feedback
     setRegisteredIds((prev) => {
       const newIds = new Set(prev);
-      newIds.add(tournamentId);
+      newIds.add(id);
       return newIds;
     });
     
     // Persist to IndexedDB (async, non-blocking)
-    addToCache(tournamentId);
+    addToCache(id);
   }, []);
 
-  const removeRegistration = useCallback((tournamentId: number) => {
+  const removeRegistration = useCallback((tournamentId: string | number) => {
+    const id = String(tournamentId);
     // Optimistic update - instant UI feedback
     setRegisteredIds((prev) => {
       const newIds = new Set(prev);
-      newIds.delete(tournamentId);
+      newIds.delete(id);
       return newIds;
     });
     
     // Persist to IndexedDB (async, non-blocking)
-    removeFromCache(tournamentId);
+    removeFromCache(id);
   }, []);
 
   const refresh = useCallback(async () => {

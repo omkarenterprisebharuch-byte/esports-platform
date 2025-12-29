@@ -20,6 +20,7 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const user = getUserFromRequest(request);
 
     const result = await pool.query(
       `SELECT 
@@ -58,7 +59,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       status: result.rows[0].computed_status,
     };
 
-    return successResponse({ tournament });
+    // Check if current user is registered for this tournament
+    let isRegistered = false;
+    if (user) {
+      const regCheck = await pool.query(
+        `SELECT 1 FROM tournament_registrations WHERE tournament_id = $1 AND user_id = $2 LIMIT 1`,
+        [id, user.id]
+      );
+      isRegistered = regCheck.rows.length > 0;
+    }
+
+    return successResponse({ tournament, isRegistered });
   } catch (error) {
     console.error("Get tournament error:", error);
     return serverErrorResponse(error);
@@ -149,19 +160,33 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
           "tournament_banner_url",
           "room_id",
           "room_password",
+          "schedule_type",
+          "publish_time",
         ];
 
+    let hasRoomCredentialUpdate = false;
+    
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updates.push(`${field} = $${paramIndex}`);
-        values.push(body[field]);
+        // Convert empty strings to null for TIME/DATE fields to avoid DB errors
+        let value = body[field];
+        if ((field === "publish_time") && value === "") {
+          value = null;
+        }
+        values.push(value);
         paramIndex++;
 
-        // Track room credentials update
+        // Track room credentials update (only add once)
         if (field === "room_id" || field === "room_password") {
-          updates.push(`room_credentials_updated_at = NOW()`);
+          hasRoomCredentialUpdate = true;
         }
       }
+    }
+
+    // Add room_credentials_updated_at only once if any room field was updated
+    if (hasRoomCredentialUpdate) {
+      updates.push(`room_credentials_updated_at = NOW()`);
     }
 
     if (updates.length === 0) {

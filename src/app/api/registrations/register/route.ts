@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         );
 
         if (existingReg.rows.length > 0) {
-          throw new Error("You are already registered for this tournament");
+          throw new Error("Registered");
         }
 
         // Get next slot number

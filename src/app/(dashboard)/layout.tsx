@@ -35,6 +35,7 @@ const menuItems = [
   { icon: "🏠", label: "Dashboard", href: "/dashboard" },
   { icon: "👤", label: "Profile", href: "/profile" },
   { icon: "👥", label: "My Teams", href: "/my-teams" },
+  { icon: "👥", label: "My Registrations", href: "/my-registrations" },
   { icon: "💰", label: "Wallet", href: "/wallet", disabled: true },
 ];
 

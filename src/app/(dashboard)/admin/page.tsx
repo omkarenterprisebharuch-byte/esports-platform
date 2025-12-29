@@ -25,6 +25,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<"tournaments" | "scheduled" | "create" | "edit" | "results">("tournaments");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTournament, setEditingTournament] = useState<TournamentWithHost | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -224,6 +225,7 @@ export default function AdminPage() {
 
   const handleEdit = (tournament: TournamentWithHost) => {
     setEditingId(tournament.id);
+    setEditingTournament(tournament);
     setForm({
       tournament_name: tournament.tournament_name,
       game_type: tournament.game_type,
@@ -238,8 +240,8 @@ export default function AdminPage() {
       registration_end_date: formatDateTimeForInput(tournament.registration_end_date),
       tournament_start_date: formatDateTimeForInput(tournament.tournament_start_date),
       tournament_end_date: formatDateTimeForInput(tournament.tournament_end_date),
-      schedule_type: "once",
-      publish_time: "",
+      schedule_type: tournament.schedule_type || "once",
+      publish_time: tournament.publish_time || "",
     });
     setActiveTab("edit");
   };
@@ -273,7 +275,14 @@ export default function AdminPage() {
 
     try {
       // Don't send entry_fee and prize_pool in update (they can't be changed)
-      const { entry_fee, prize_pool, ...updateData } = form;
+      // Also handle empty publish_time - send null instead of empty string
+      const { entry_fee, prize_pool, publish_time, ...updateData } = form;
+      
+      // Only include publish_time if it has a value, otherwise send null
+      const finalUpdateData = {
+        ...updateData,
+        publish_time: publish_time || null,
+      };
       
       const res = await fetch(`/api/tournaments/${editingId}`, {
         method: "PUT",
@@ -281,7 +290,7 @@ export default function AdminPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify(finalUpdateData),
       });
 
       const data = await res.json();
@@ -289,6 +298,7 @@ export default function AdminPage() {
       if (res.ok) {
         setMessage({ type: "success", text: "Tournament updated successfully!" });
         setEditingId(null);
+        setEditingTournament(null);
         setForm({
           tournament_name: "",
           game_type: "freefire",
@@ -320,6 +330,7 @@ export default function AdminPage() {
 
   const cancelEdit = () => {
     setEditingId(null);
+    setEditingTournament(null);
     setForm({
       tournament_name: "",
       game_type: "freefire",
@@ -1162,6 +1173,16 @@ export default function AdminPage() {
             </p>
           </div>
 
+          {/* Warning if tournament has registrations */}
+          {editingTournament && (editingTournament.current_teams > 0) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+              <p className="text-amber-700 text-sm">
+                ⚠️ This tournament has <strong>{editingTournament.current_teams} registration(s)</strong>. 
+                Date fields cannot be modified to protect registered participants.
+              </p>
+            </div>
+          )}
+
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Basic Information</h2>
 
@@ -1292,13 +1313,16 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {(() => {
+            const hasRegs = !!(editingTournament && editingTournament.current_teams > 0);
+            return (
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h2 className="font-semibold text-gray-900 mb-4">Schedule</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Registration Start *
+                  Registration Start * {hasRegs && <span className="text-amber-600">(locked)</span>}
                 </label>
                 <input
                   type="datetime-local"
@@ -1307,13 +1331,14 @@ export default function AdminPage() {
                     setForm({ ...form, registration_start_date: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  disabled={hasRegs}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent ${hasRegs ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Registration End *
+                  Registration End * {hasRegs && <span className="text-amber-600">(locked)</span>}
                 </label>
                 <input
                   type="datetime-local"
@@ -1322,13 +1347,14 @@ export default function AdminPage() {
                     setForm({ ...form, registration_end_date: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  disabled={hasRegs}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent ${hasRegs ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tournament Start *
+                  Tournament Start * {hasRegs && <span className="text-amber-600">(locked)</span>}
                 </label>
                 <input
                   type="datetime-local"
@@ -1337,13 +1363,14 @@ export default function AdminPage() {
                     setForm({ ...form, tournament_start_date: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  disabled={hasRegs}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent ${hasRegs ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tournament End *
+                  Tournament End * {hasRegs && <span className="text-amber-600">(locked)</span>}
                 </label>
                 <input
                   type="datetime-local"
@@ -1352,11 +1379,14 @@ export default function AdminPage() {
                     setForm({ ...form, tournament_end_date: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  disabled={hasRegs}
+                  className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent ${hasRegs ? 'bg-gray-100 cursor-not-allowed opacity-60' : ''}`}
                 />
               </div>
             </div>
           </div>
+            );
+          })()}
 
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h2 className="font-semibold text-gray-900 mb-4">

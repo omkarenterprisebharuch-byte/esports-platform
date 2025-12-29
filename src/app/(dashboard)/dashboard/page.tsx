@@ -26,7 +26,7 @@ export default function DashboardPage() {
           if (data.success) {
             const allTournaments = data.data.tournaments || [];
             const registered = allTournaments.filter((t: TournamentWithHost) => 
-              registeredIds.has(t.id)
+              registeredIds.has(String(t.id))
             );
             setTournaments(registered);
           }
@@ -172,9 +172,9 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Registration Status */}
-                  {registeredIds.has(tournament.id) ? (
+                  {registeredIds.has(String(tournament.id)) ? (
                     <div className="py-2 bg-blue-100 text-blue-700 font-medium rounded-lg text-sm text-center">
-                      ✓ You & your team is already registered
+                      Registered
                     </div>
                   ) : (() => {
                     const now = Date.now();

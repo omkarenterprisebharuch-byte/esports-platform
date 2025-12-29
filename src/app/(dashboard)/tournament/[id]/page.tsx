@@ -50,8 +50,13 @@ export default function TournamentDetailsPage() {
   const [registering, setRegistering] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
-  // Derived from cache
-  const isAlreadyRegistered = isRegistered(Number(params.id));
+  // Registration status from server (more reliable than cache)
+  const [serverRegistered, setServerRegistered] = useState<boolean | null>(null);
+  
+  // Derived - prefer server response, fallback to cache
+  const tournamentId = params.id as string;
+  const cacheRegistered = isRegistered(tournamentId);
+  const isAlreadyRegistered = serverRegistered !== null ? serverRegistered : cacheRegistered;
   
   // On-demand data - fetched only when user explicitly requests
   const [winners, setWinners] = useState<Winners | null>(null);
@@ -66,11 +71,10 @@ export default function TournamentDetailsPage() {
 
   // Fetch only essential data on page load
   // Winners, room credentials, and chat are loaded on-demand
-  // Registration status comes from cache
+  // Registration status comes from API (with cache as fallback)
   useEffect(() => {
     const token = localStorage.getItem("token");
 
-    // Only 1 API call - registration status from cache
     fetch(`/api/tournaments/${params.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -78,10 +82,18 @@ export default function TournamentDetailsPage() {
       .then((tournamentData) => {
         if (tournamentData.success) {
           setTournament(tournamentData.data.tournament);
+          // Use isRegistered from API response
+          if (typeof tournamentData.data.isRegistered === 'boolean') {
+            setServerRegistered(tournamentData.data.isRegistered);
+            // Also update cache if registered
+            if (tournamentData.data.isRegistered) {
+              addRegistration(tournamentId);
+            }
+          }
         }
       })
       .finally(() => setLoading(false));
-  }, [params.id]);
+  }, [params.id, tournamentId, addRegistration]);
 
   // Fetch winners on demand when user expands the section
   const fetchWinners = useCallback(async () => {
@@ -186,7 +198,7 @@ export default function TournamentDetailsPage() {
           type: "success",
           text: `Successfully registered! Your slot number is #${data.data.slot_number}`,
         });
-        addRegistration(Number(params.id));
+        addRegistration(tournamentId);
         
         // Refresh tournament data for updated team count
         const refreshRes = await fetch(`/api/tournaments/${params.id}`, {
@@ -320,8 +332,8 @@ export default function TournamentDetailsPage() {
         </div>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      {/* Stats Grid - 4 tiles + optional 5th tile for Room Credentials */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
         <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
           <p className="text-sm text-gray-500">Prize Pool</p>
           <p className="text-2xl font-bold text-green-600">
@@ -346,10 +358,7 @@ export default function TournamentDetailsPage() {
             {tournament.tournament_type}
           </p>
         </div>
-      </div>
-
-      {/* Room Credentials Box - 5th stat */}
-      <div className="mb-6">
+        {/* 5th tile - Room Credentials (only shown as tile, reveal works same way) */}
         <LazyRoomCredentials tournamentId={tournament.id} isRegistered={isAlreadyRegistered} />
       </div>
 
