@@ -105,14 +105,33 @@
   - Log all admin actions with before/after values
   - Build admin audit log viewer
 
-- [ ] **Multi-device login alerts**
-  - Track active sessions per user
-  - Send email on new device login
+- [x] **Multi-device login alerts** ✅ (Implemented December 30, 2025)
+  - Created `device-detection.ts` utility to parse user-agent and generate device fingerprints
+  - Device detection identifies: device type (desktop/mobile/tablet), browser, OS, versions
+  - Login route now detects new devices by comparing fingerprints with existing sessions
+  - Sends email alert with device info (browser, OS, IP, time) when new device detected
+  - Created `/api/auth/sessions` endpoint for session management:
+    - GET: List all active sessions with device info
+    - DELETE: Revoke specific session (logout device)
+    - POST: Revoke all sessions except current
+  - Files: `device-detection.ts`, `email.ts`, `login/route.ts`, `sessions/route.ts`
 
-- [ ] **IP-based fraud detection**
-  - Track login IPs per user
-  - Flag logins from new locations
-  - Implement velocity checking
+- [x] **IP-based fraud detection** ✅ (Implemented December 30, 2025)
+  - Created `login_history` table to track all login attempts with status and IP
+  - Created `known_user_ips` table to track trusted IPs per user
+  - Migration: `create_login_history.sql`
+  - Created `fraud-detection.ts` utility with:
+    - Velocity checking: blocks IP after 5 failed attempts in 15 min
+    - Email velocity: blocks after 10 failed attempts per email
+    - New IP detection: flags first-time IPs for users
+    - Suspicious pattern detection: multiple users per IP, high login frequency
+    - Risk scoring system (0-100) based on multiple factors
+  - Login route now records all attempts (success/failed/blocked/suspicious)
+  - Sends email alerts for suspicious logins with risk level and reasons
+  - Created `/api/owner/fraud` endpoint for admin review:
+    - GET: Fraud stats, flagged logins, user login history
+    - POST: Mark flagged login as reviewed
+  - Files: `fraud-detection.ts`, `email.ts`, `login/route.ts`, `owner/fraud/route.ts`
 
 - [ ] **Suspicious activity flagging system**
   - Define suspicious patterns (rapid registrations, etc.)

@@ -26,6 +26,13 @@ import {
   validateWithSchema, 
   validationErrorResponse 
 } from "@/lib/validations";
+import { parseUserAgent, getDeviceName } from "@/lib/device-detection";
+import { sendNewDeviceLoginEmail, sendSuspiciousLoginEmail } from "@/lib/email";
+import { 
+  performFraudCheck, 
+  recordLoginAttempt, 
+  checkVelocity 
+} from "@/lib/fraud-detection";
 
 /**
  * POST /api/auth/login
@@ -53,6 +60,26 @@ export async function POST(request: NextRequest) {
     
     const { email, password, remember_me } = validation.data;
 
+    // Get device info for security tracking
+    const userAgent = request.headers.get("user-agent") || "unknown";
+    const deviceInfo = parseUserAgent(userAgent);
+
+    // Check velocity (rate limiting based on login history)
+    const velocityCheck = await checkVelocity(clientIp, email);
+    if (velocityCheck.blocked) {
+      // Record blocked attempt
+      await recordLoginAttempt({
+        email,
+        ipAddress: clientIp,
+        userAgent,
+        status: 'blocked',
+        failureReason: velocityCheck.reason,
+        flagged: true,
+        flagReason: velocityCheck.reason,
+      });
+      return errorResponse(velocityCheck.reason || "Too many login attempts", 429);
+    }
+
     // Find user by email (including role and email_verified)
     const result = await pool.query(
       "SELECT *, COALESCE(role, 'player') as role, COALESCE(email_verified, FALSE) as email_verified FROM users WHERE email = $1", 
@@ -60,6 +87,14 @@ export async function POST(request: NextRequest) {
     );
 
     if (result.rows.length === 0) {
+      // Record failed attempt - user not found
+      await recordLoginAttempt({
+        email,
+        ipAddress: clientIp,
+        userAgent,
+        status: 'failed',
+        failureReason: 'User not found',
+      });
       return errorResponse("Invalid credentials", 401);
     }
 
@@ -68,7 +103,43 @@ export async function POST(request: NextRequest) {
     // Verify password
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
+      // Record failed attempt - wrong password
+      await recordLoginAttempt({
+        userId: user.id,
+        email,
+        ipAddress: clientIp,
+        userAgent,
+        status: 'failed',
+        failureReason: 'Invalid password',
+      });
       return errorResponse("Invalid credentials", 401);
+    }
+
+    // Perform comprehensive fraud check
+    const fraudCheck = await performFraudCheck(user.id, email, clientIp);
+
+    // Record successful login with fraud detection results
+    await recordLoginAttempt({
+      userId: user.id,
+      email,
+      ipAddress: clientIp,
+      userAgent,
+      status: fraudCheck.shouldFlag ? 'suspicious' : 'success',
+      isNewIp: fraudCheck.isNewIp,
+      flagged: fraudCheck.shouldFlag,
+      flagReason: fraudCheck.flagReason,
+    });
+
+    // Send suspicious login alert if flagged
+    if (fraudCheck.shouldFlag && fraudCheck.flagReason) {
+      sendSuspiciousLoginEmail(user.email, user.username, {
+        ipAddress: clientIp,
+        loginTime: new Date(),
+        reasons: fraudCheck.flagReason.split("; "),
+        riskScore: fraudCheck.riskScore,
+      }).catch(err => {
+        console.error("Failed to send suspicious login email:", err);
+      });
     }
 
     // Generate access token (15 min) with role and email_verified
@@ -91,8 +162,20 @@ export async function POST(request: NextRequest) {
       ? REMEMBER_ME_EXPIRY_DAYS * 24 * 60 * 60 
       : REFRESH_COOKIE_OPTIONS.maxAge;
 
-    // Get device info for security tracking
-    const userAgent = request.headers.get("user-agent") || "unknown";
+    // Check if this is a new device for this user (for device-specific alert)
+    const existingDevices = await pool.query(
+      `SELECT DISTINCT user_agent FROM refresh_tokens 
+       WHERE user_id = $1 AND revoked = FALSE AND expires_at > NOW()`,
+      [user.id]
+    );
+
+    // Get fingerprints of known devices
+    const knownFingerprints = existingDevices.rows.map(row => {
+      const parsed = parseUserAgent(row.user_agent || "");
+      return parsed.fingerprint;
+    });
+
+    const isNewDevice = !knownFingerprints.includes(deviceInfo.fingerprint);
 
     // Store refresh token hash in database (with remember_me flag)
     await pool.query(
@@ -100,6 +183,20 @@ export async function POST(request: NextRequest) {
        VALUES ($1, $2, $3, $4, $5)`,
       [user.id, refreshTokenHash, refreshTokenExpiry, userAgent, clientIp]
     );
+
+    // Send new device login alert email (async, don't block login)
+    if (isNewDevice && existingDevices.rows.length > 0) {
+      // Only send alert if user has logged in before (not first login)
+      sendNewDeviceLoginEmail(user.email, user.username, {
+        deviceName: getDeviceName(deviceInfo),
+        browser: `${deviceInfo.browser}${deviceInfo.browserVersion ? ' ' + deviceInfo.browserVersion : ''}`,
+        os: `${deviceInfo.os}${deviceInfo.osVersion ? ' ' + deviceInfo.osVersion : ''}`,
+        ipAddress: clientIp,
+        loginTime: new Date(),
+      }).catch(err => {
+        console.error("Failed to send new device login email:", err);
+      });
+    }
 
     // Generate CSRF token
     const csrfToken = generateCsrfToken(user.id);
