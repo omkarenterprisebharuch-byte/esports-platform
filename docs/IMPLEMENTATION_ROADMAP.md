@@ -255,7 +255,7 @@
   - Implement verification flow (screenshot or API)
   - Show verified badge on profile
 
-### 2.4 Social Features (Week 6)
+### 2.4 Social Features (Week 6) ✅ (Fully implemented )
 - [ ] **Quick share tournament links to social media**
   - Add share buttons (WhatsApp, Twitter, Discord)
   - Generate OG meta tags for previews
@@ -272,12 +272,12 @@
   - Optimize touch targets
   - Test on various devices
 
-- [ ] **Dark/light theme toggle**
+- [ ] **Dark/light theme toggle** ✅ (Implemented)
   - Implement theme context
   - Add toggle in header/settings
   - Persist preference in localStorage
 
-- [ ] **PWA for app-like experience**
+- [ ] **PWA for app-like experience**  ✅ (Implemented)
   - Create manifest.json ✅ (Partially done)
   - Implement offline support
   - Add install prompt

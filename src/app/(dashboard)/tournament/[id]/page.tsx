@@ -9,6 +9,7 @@ import { TournamentWithHost } from "@/types";
 import { LazyRoomCredentials } from "@/components/ui";
 import { SkeletonBanner, SkeletonStatsGrid, SkeletonDetails } from "@/components/ui/Skeleton";
 import { useRegistrationCache } from "@/hooks/useRegistrationCache";
+import { ShareButton } from "@/components/ui/ShareButtons";
 
 // Lazy load chat components - only loaded when user opens chat
 const ChatButton = dynamic(() => import("@/components/chat/ChatButton"), {
@@ -307,15 +308,24 @@ export default function TournamentDetailsPage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         <div className="absolute bottom-4 left-4 right-4 text-white">
-          <span
-            className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase mb-2 ${getStatusStyle(tournament.status)}`}
-          >
-            {tournament.status.replace("_", " ")}
-          </span>
-          <h1 className="text-2xl md:text-3xl font-bold">
-            {tournament.tournament_name}
-          </h1>
-          <p className="text-white/80">by {tournament.host_name}</p>
+          <div className="flex items-start justify-between">
+            <div>
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase mb-2 ${getStatusStyle(tournament.status)}`}
+              >
+                {tournament.status.replace("_", " ")}
+              </span>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {tournament.tournament_name}
+              </h1>
+              <p className="text-white/80">by {tournament.host_name}</p>
+            </div>
+            <ShareButton
+              url={typeof window !== "undefined" ? window.location.href : `/tournament/${tournament.id}`}
+              title={`${tournament.tournament_name} - ${tournament.game_type.toUpperCase()} Tournament`}
+              description={`💰 ₹${tournament.prize_pool} Prize Pool • 👥 ${tournament.current_teams}/${tournament.max_teams} Teams • ${tournament.entry_fee > 0 ? `₹${tournament.entry_fee} Entry` : "Free Entry"}`}
+            />
+          </div>
         </div>
       </div>
 

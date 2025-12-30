@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { TournamentWithHost, User } from "@/types";
 import { secureFetch } from "@/lib/api-client";
 
@@ -607,16 +608,12 @@ export default function AdminPage() {
             </span>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab("create")}
-          className={`px-4 py-2 rounded-lg font-medium transition ${
-            activeTab === "create"
-              ? "bg-gray-900 text-white"
-              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          }`}
+        <Link
+          href="/admin/create-tournament"
+          className="px-4 py-2 rounded-lg font-medium transition bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 flex items-center gap-2"
         >
-          Create Tournament
-        </button>
+          ✨ Create Tournament
+        </Link>
       </div>
 
       {activeTab === "tournaments" && (
@@ -626,12 +623,12 @@ export default function AdminPage() {
               <p className="text-gray-500 mb-4">
                 You haven&apos;t created any tournaments yet
               </p>
-              <button
-                onClick={() => setActiveTab("create")}
-                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+              <Link
+                href="/admin/create-tournament"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition"
               >
-                Create Your First Tournament
-              </button>
+                ✨ Create Your First Tournament
+              </Link>
             </div>
           ) : (
             tournaments.map((tournament) => (
@@ -755,12 +752,12 @@ export default function AdminPage() {
               <p className="text-gray-500 mb-4">
                 You haven&apos;t created any scheduled recurring tournaments yet
               </p>
-              <button
-                onClick={() => setActiveTab("create")}
-                className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+              <Link
+                href="/admin/create-tournament"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition"
               >
-                Create Scheduled Tournament
-              </button>
+                ✨ Create Scheduled Tournament
+              </Link>
             </div>
           ) : (
             scheduledTemplates.map((template) => (

@@ -3,12 +3,29 @@
 :root {
   --background: #f9fafb;
   --foreground: #111827;
+  --card-bg: #ffffff;
+  --card-border: #e5e7eb;
+  --muted: #6b7280;
+  --muted-foreground: #9ca3af;
+}
+
+.dark {
+  --background: #111827;
+  --foreground: #f9fafb;
+  --card-bg: #1f2937;
+  --card-border: #374151;
+  --muted: #9ca3af;
+  --muted-foreground: #6b7280;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --background: #111827;
     --foreground: #f9fafb;
+    --card-bg: #1f2937;
+    --card-border: #374151;
+    --muted: #9ca3af;
+    --muted-foreground: #6b7280;
   }
 }
 
@@ -16,6 +33,20 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark mode utility classes */
+.bg-card {
+  background-color: var(--card-bg);
+}
+
+.border-card {
+  border-color: var(--card-border);
+}
+
+.text-muted {
+  color: var(--muted);
 }
 
 /* Animations */
@@ -25,8 +56,36 @@ body {
   }
 }
 
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
 }
 
 /* Scrollbar styling */
