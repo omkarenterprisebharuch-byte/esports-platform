@@ -1,11 +1,9 @@
 import { Pool, PoolClient, PoolConfig } from "pg";
 
-// Allow self-signed certificates for cloud database providers
-// Only set in development to avoid the warning during production builds
-// The SSL config with rejectUnauthorized: false handles this properly
-if (process.env.NODE_ENV === "development") {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-}
+// Allow self-signed certificates for cloud database providers like Aiven
+// This is needed during build time (generateStaticParams) and runtime
+// The SSL config with rejectUnauthorized: false is the proper way to handle this
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 // ============ Connection Queue Management ============
 // For Aiven free tier with 3-connection limit
