@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { secureFetch } from "@/lib/api-client";
 
 interface User {
   id: number;
@@ -32,11 +33,7 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    fetch("/api/users/profile", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    secureFetch("/api/users/profile")
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -56,15 +53,9 @@ export default function ProfilePage() {
     setSaving(true);
     setMessage(null);
 
-    const token = localStorage.getItem("token");
-
     try {
-      const res = await fetch("/api/users/profile", {
+      const res = await secureFetch("/api/users/profile", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(form),
       });
 

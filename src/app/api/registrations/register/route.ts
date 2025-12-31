@@ -16,6 +16,7 @@ import {
   addToWaitlist,
   getWaitlistStatus,
 } from "@/lib/waitlist";
+import { isGameIdBanned, getBanMessage, checkMultipleGameIds } from "@/lib/ban-check";
 
 // Schema for tournament registration
 const registerTournamentSchema = z.object({
@@ -125,6 +126,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Check if user's game ID is banned
+      const banStatus = await isGameIdBanned(userGameId, gameType);
+      if (banStatus.banned) {
+        throw new Error(getBanMessage(banStatus));
+      }
+
       const tournamentType = tournament.tournament_type;
 
       if (tournamentType === "solo") {
@@ -214,6 +221,39 @@ export async function POST(request: NextRequest) {
 
         if (memberCheck.rows.length === 0) {
           throw new Error("You are not a member of this team");
+        }
+
+        // Get all selected players' game IDs and check for bans
+        const playerIds = selected_players || [user.id];
+        const playersResult = await client.query(
+          `SELECT u.id, u.username, u.in_game_ids 
+           FROM users u 
+           WHERE u.id = ANY($1::int[])`,
+          [playerIds]
+        );
+
+        // Check each player's game ID for bans
+        const gameIdsToCheck = playersResult.rows
+          .filter(p => p.in_game_ids?.[gameType])
+          .map(p => ({
+            gameId: p.in_game_ids[gameType],
+            gameType: gameType,
+            username: p.username,
+          }));
+
+        if (gameIdsToCheck.length > 0) {
+          const banResults = await checkMultipleGameIds(
+            gameIdsToCheck.map(g => ({ gameId: g.gameId, gameType: g.gameType }))
+          );
+
+          for (const { gameId, gameType: gType, username } of gameIdsToCheck) {
+            const banStatus = banResults.get(`${gameId}:${gType}`);
+            if (banStatus?.banned) {
+              throw new Error(
+                `Player "${username}" cannot participate: ${getBanMessage(banStatus)}`
+              );
+            }
+          }
         }
 
         // Check if team already registered or on waitlist

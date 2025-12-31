@@ -390,10 +390,6 @@
   - Auto-promote qualifiers
   - Track qualification status
 
-- [ ] **Cross-platform tournament support (PC/Mobile)**
-  - Add platform field to tournaments
-  - Filter by platform
-  - Platform-specific rules
 
 - [ ] **Tournament result dispute resolution system**
   - Create dispute submission form
