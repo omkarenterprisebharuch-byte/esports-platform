@@ -5,3 +5,4 @@ export {
   OfflineIndicator, 
   queueBackgroundSync 
 } from './ServiceWorkerProvider';
+export { default as PWAProvider } from './PWAProvider';

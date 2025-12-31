@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { secureFetch } from "@/lib/api-client";
 import {
   GameSelectionStep,
   BasicInfoStep,
@@ -65,15 +66,7 @@ export default function CreateTournamentWizard() {
 
   // Check authorization
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-
-    fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    secureFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -238,13 +231,8 @@ export default function CreateTournamentWizard() {
     };
 
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/tournaments", {
+      const res = await secureFetch("/api/tournaments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(payload),
       });
 

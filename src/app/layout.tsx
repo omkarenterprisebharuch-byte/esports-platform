@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, themeScript } from "@/contexts/ThemeContext";
-import { InstallPrompt, UpdateNotification, OfflineIndicator } from "@/components/pwa";
+import { PWAProvider } from "@/components/pwa";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -65,10 +65,9 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
-          {children}
-          <InstallPrompt />
-          <UpdateNotification />
-          <OfflineIndicator />
+          <PWAProvider>
+            {children}
+          </PWAProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -86,12 +86,8 @@ export default function AdminPage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    // Get current user
-    fetch("/api/auth/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    // Get current user using cookie-based auth
+    secureFetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -101,17 +97,20 @@ export default function AdminPage() {
             router.push("/dashboard");
           } else {
             setUser(userData);
-            fetchMyTournaments(token);
-            fetchScheduledTemplates(token);
+            fetchMyTournaments();
+            fetchScheduledTemplates();
           }
+        } else {
+          router.push("/login");
         }
+      })
+      .catch(() => {
+        router.push("/login");
       });
   }, [router]);
 
-  const fetchMyTournaments = (token: string | null) => {
-    fetch("/api/tournaments?hosted=true", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+  const fetchMyTournaments = () => {
+    secureFetch("/api/tournaments?hosted=true")
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -121,10 +120,8 @@ export default function AdminPage() {
       .finally(() => setLoading(false));
   };
 
-  const fetchScheduledTemplates = (token: string | null) => {
-    fetch("/api/tournaments?hosted=true&templates=true", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+  const fetchScheduledTemplates = () => {
+    secureFetch("/api/tournaments?hosted=true&templates=true")
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -158,15 +155,10 @@ export default function AdminPage() {
     }
 
     setCreating(true);
-    const token = localStorage.getItem("token");
 
     try {
-      const res = await fetch("/api/tournaments", {
+      const res = await secureFetch("/api/tournaments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(form),
       });
 
@@ -192,8 +184,8 @@ export default function AdminPage() {
           schedule_type: "once",
           publish_time: "",
         });
-        fetchMyTournaments(token);
-        fetchScheduledTemplates(token);
+        fetchMyTournaments();
+        fetchScheduledTemplates();
         // Navigate to appropriate tab based on schedule type
         setActiveTab(wasScheduled ? "scheduled" : "tournaments");
       } else {
@@ -272,7 +264,6 @@ export default function AdminPage() {
     }
 
     setCreating(true);
-    const token = localStorage.getItem("token");
 
     try {
       // Don't send entry_fee and prize_pool in update (they can't be changed)
@@ -285,12 +276,8 @@ export default function AdminPage() {
         publish_time: publish_time || null,
       };
       
-      const res = await fetch(`/api/tournaments/${editingId}`, {
+      const res = await secureFetch(`/api/tournaments/${editingId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(finalUpdateData),
       });
 
@@ -317,7 +304,7 @@ export default function AdminPage() {
           schedule_type: "once",
           publish_time: "",
         });
-        fetchMyTournaments(token);
+        fetchMyTournaments();
         setActiveTab("tournaments");
       } else {
         setMessage({ type: "error", text: data.message });
@@ -414,15 +401,9 @@ export default function AdminPage() {
   const handleSaveRoomCredentials = async () => {
     if (!roomCredentialsModal.tournamentId) return;
 
-    const token = localStorage.getItem("token");
-
     try {
-      const res = await fetch(`/api/registrations/room-credentials/${roomCredentialsModal.tournamentId}`, {
+      const res = await secureFetch(`/api/registrations/room-credentials/${roomCredentialsModal.tournamentId}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           room_id: roomCredentialsModal.roomId,
           room_password: roomCredentialsModal.roomPassword,
@@ -434,7 +415,7 @@ export default function AdminPage() {
       if (res.ok) {
         setMessage({ type: "success", text: "Room credentials shared successfully!" });
         setRoomCredentialsModal({ show: false, tournamentId: null, tournamentName: "", roomId: "", roomPassword: "" });
-        fetchMyTournaments(token);
+        fetchMyTournaments();
       } else {
         setMessage({ type: "error", text: data.message });
       }
@@ -456,13 +437,9 @@ export default function AdminPage() {
     setActiveTab("results");
     setMessage(null);
 
-    const token = localStorage.getItem("token");
-
     try {
       // Fetch registrations for the tournament
-      const regRes = await fetch(`/api/tournaments/${tournament.id}/registrations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const regRes = await secureFetch(`/api/tournaments/${tournament.id}/registrations`);
       const regData = await regRes.json();
 
       if (regData.success) {
@@ -470,9 +447,7 @@ export default function AdminPage() {
       }
 
       // Fetch existing winners
-      const winnersRes = await fetch(`/api/tournaments/${tournament.id}/winners`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const winnersRes = await secureFetch(`/api/tournaments/${tournament.id}/winners`);
       const winnersData = await winnersRes.json();
 
       if (winnersData.success && winnersData.data.winners) {
@@ -508,15 +483,10 @@ export default function AdminPage() {
     }
 
     setSavingResults(true);
-    const token = localStorage.getItem("token");
 
     try {
-      const res = await fetch(`/api/tournaments/${resultsTournament.id}/winners`, {
+      const res = await secureFetch(`/api/tournaments/${resultsTournament.id}/winners`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           winner_1: winner1,
           winner_2: winner2,
