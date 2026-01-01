@@ -18,6 +18,7 @@ import {
 } from "@/lib/waitlist";
 import { isGameIdBanned, getBanMessage, checkMultipleGameIds } from "@/lib/ban-check";
 import { invalidateDbCache } from "@/lib/db-cache";
+import { getWalletBalance, debitWallet, holdBalance, getAvailableBalance } from "@/lib/wallet";
 
 // Schema for tournament registration
 const registerTournamentSchema = z.object({
@@ -135,6 +136,22 @@ export async function POST(request: NextRequest) {
 
       const tournamentType = tournament.tournament_type;
 
+      // Check entry fee requirement (applies to both solo and team registrations)
+      const entryFee = parseFloat(tournament.entry_fee) || 0;
+      let entryFeeDeducted = false;
+      let entryFeeHeld = false;
+
+      if (entryFee > 0) {
+        // Check if the registering player has sufficient AVAILABLE balance
+        // (Available = wallet_balance - hold_balance)
+        const availableBalance = await getAvailableBalance(user.id);
+        if (availableBalance < entryFee) {
+          throw new Error(
+            `Insufficient available balance. Entry fee: ₹${entryFee}, Your available balance: ₹${availableBalance.toFixed(2)}. Please add funds to your wallet.`
+          );
+        }
+      }
+
       if (tournamentType === "solo") {
         // SOLO REGISTRATION
         const existingReg = await client.query(
@@ -170,10 +187,25 @@ export async function POST(request: NextRequest) {
             [tournament_id, user.id, waitlistPosition]
           );
 
+          // Hold entry fee for waitlist registration (will be deducted when slot is confirmed)
+          if (entryFee > 0) {
+            await holdBalance(
+              user.id,
+              entryFee,
+              "waitlist_entry_fee",
+              "tournament_registration",
+              regResult.rows[0].id.toString(),
+              `Entry fee hold for waitlist: ${tournament.tournament_name}`
+            );
+            entryFeeHeld = true;
+          }
+
           return {
             registration: regResult.rows[0],
             waitlist_position: waitlistPosition,
             is_waitlisted: true,
+            entry_fee_paid: 0,
+            entry_fee_held: entryFeeHeld ? entryFee : 0,
           };
         }
 
@@ -201,10 +233,23 @@ export async function POST(request: NextRequest) {
           [tournament_id]
         );
 
+        // Deduct entry fee from registering player's wallet
+        if (entryFee > 0) {
+          await debitWallet(
+            user.id,
+            entryFee,
+            "entry_fee",
+            `Entry fee for tournament: ${tournament.tournament_name}`,
+            tournament_id
+          );
+          entryFeeDeducted = true;
+        }
+
         return {
           registration: regResult.rows[0],
           slot_number: slotNumber,
           is_waitlisted: false,
+          entry_fee_paid: entryFeeDeducted ? entryFee : 0,
         };
       } else {
         // DUO/SQUAD REGISTRATION
@@ -299,10 +344,25 @@ export async function POST(request: NextRequest) {
             ]
           );
 
+          // Hold entry fee for waitlist registration (will be deducted when slot is confirmed)
+          if (entryFee > 0) {
+            await holdBalance(
+              user.id,
+              entryFee,
+              "waitlist_entry_fee",
+              "tournament_registration",
+              regResult.rows[0].id.toString(),
+              `Entry fee hold for waitlist: ${tournament.tournament_name} (Team registration)`
+            );
+            entryFeeHeld = true;
+          }
+
           return {
             registration: regResult.rows[0],
             waitlist_position: waitlistPosition,
             is_waitlisted: true,
+            entry_fee_paid: 0,
+            entry_fee_held: entryFeeHeld ? entryFee : 0,
           };
         }
 
@@ -337,18 +397,39 @@ export async function POST(request: NextRequest) {
           [tournament_id]
         );
 
+        // Deduct entry fee from registering player (captain) wallet
+        // For squad/duo matches, only the player doing registration pays
+        if (entryFee > 0) {
+          await debitWallet(
+            user.id,
+            entryFee,
+            "entry_fee",
+            `Entry fee for tournament: ${tournament.tournament_name} (Team registration)`,
+            tournament_id
+          );
+          entryFeeDeducted = true;
+        }
+
         return {
           registration: regResult.rows[0],
           slot_number: slotNumber,
           is_waitlisted: false,
+          entry_fee_paid: entryFeeDeducted ? entryFee : 0,
         };
       }
     });
 
-    // Customize success message based on waitlist status
-    const message = result.is_waitlisted
+    // Customize success message based on waitlist status and entry fee
+    let message = result.is_waitlisted
       ? `Added to waitlist at position ${result.waitlist_position}`
       : "Successfully registered for the tournament";
+    
+    // Add entry fee info to message
+    if (result.entry_fee_paid && result.entry_fee_paid > 0) {
+      message += ` (₹${result.entry_fee_paid} deducted from wallet)`;
+    } else if (result.entry_fee_held && result.entry_fee_held > 0) {
+      message += ` (₹${result.entry_fee_held} held from wallet - will be deducted when slot is confirmed)`;
+    }
 
     // Invalidate registration-related caches
     await invalidateDbCache.registration(user.id, tournament_id);

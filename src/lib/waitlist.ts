@@ -6,10 +6,12 @@
  * - Waitlist only available when tournament start is > 45 minutes away
  * - Auto-promote from waitlist when a regular spot opens
  * - Send notification when promoted
+ * - Entry fee is held on waitlist registration, confirmed on promotion, released on cancellation
  */
 
 import pool, { withTransaction } from "./db";
 import { sendPushNotification, sendEmail, generateTournamentEmail } from "./notifications";
+import { confirmHoldByReference, releaseHoldByReference } from "./wallet";
 
 // Minimum time before tournament start for waitlist registration (in minutes)
 const WAITLIST_CUTOFF_MINUTES = 45;
@@ -270,6 +272,24 @@ export async function promoteFromWaitlist(
     );
     const slotNumber = slotResult.rows[0].next_slot;
 
+    // Confirm the balance hold - this deducts the entry fee from wallet
+    let entryFeeConfirmed = false;
+    try {
+      const holdResult = await confirmHoldByReference(
+        "tournament_registration",
+        promotedEntry.id.toString(),
+        "entry_fee",
+        `Entry fee confirmed for tournament: ${tournament.tournament_name}`
+      );
+      if (holdResult) {
+        entryFeeConfirmed = true;
+      }
+    } catch (holdError) {
+      console.error("Failed to confirm hold for promoted user:", holdError);
+      // Continue with promotion even if hold confirmation fails
+      // The hold might not exist if it was a free tournament
+    }
+
     // Promote the user
     await client.query(
       `UPDATE tournament_registrations 
@@ -301,10 +321,14 @@ export async function promoteFromWaitlist(
     // Send notification to promoted user
     try {
       // Send push notification
+      const entryFeeMessage = entryFeeConfirmed 
+        ? " Your entry fee has been deducted from your wallet."
+        : "";
+      
       await sendPushNotification(
         promotedEntry.user_id,
         "🎉 You've been promoted from the waitlist!",
-        `A spot opened up in ${tournament.tournament_name}. You're now registered!`,
+        `A spot opened up in ${tournament.tournament_name}. You're now registered!${entryFeeMessage}`,
         { tournamentId, type: "waitlist_promotion" }
       );
 
@@ -315,7 +339,7 @@ export async function promoteFromWaitlist(
         "You've Been Promoted from the Waitlist! 🎉",
         `Great news! A spot has opened up in ${tournament.tournament_name} and you've been automatically promoted from the waitlist.
 
-You are now officially registered for the tournament with slot number ${slotNumber}.
+You are now officially registered for the tournament with slot number ${slotNumber}.${entryFeeConfirmed ? "\n\nYour entry fee that was on hold has now been deducted from your wallet." : ""}
 
 Make sure to check in before the tournament starts and get ready to compete!`
       );
@@ -334,17 +358,18 @@ Make sure to check in before the tournament starts and get ready to compete!`
       promoted: true,
       promotedUserId: promotedEntry.user_id,
       newPosition: slotNumber,
+      entryFeeConfirmed,
     };
   });
 }
-
 /**
  * Cancel a waitlist registration
+ * Releases any held balance back to the user's available balance
  */
 export async function cancelWaitlistRegistration(
   tournamentId: string,
   userId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; balanceReleased?: number }> {
   return withTransaction(async (client) => {
     // Get the waitlist entry
     const regResult = await client.query(
@@ -358,6 +383,22 @@ export async function cancelWaitlistRegistration(
     }
 
     const registration = regResult.rows[0];
+
+    // Release the balance hold (if any)
+    let balanceReleased = 0;
+    try {
+      const releaseResult = await releaseHoldByReference(
+        "tournament_registration",
+        registration.id.toString(),
+        "Waitlist registration cancelled"
+      );
+      if (releaseResult) {
+        balanceReleased = releaseResult.amount;
+      }
+    } catch (releaseError) {
+      console.error("Failed to release hold for cancelled waitlist registration:", releaseError);
+      // Continue with cancellation even if release fails
+    }
 
     // Cancel the registration
     await client.query(
@@ -376,7 +417,7 @@ export async function cancelWaitlistRegistration(
       [tournamentId, registration.waitlist_position]
     );
 
-    return { success: true };
+    return { success: true, balanceReleased };
   });
 }
 

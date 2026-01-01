@@ -488,6 +488,57 @@ export const ERROR_CODES: Record<string, ErrorCodeInfo> = {
     category: "Payment",
   },
 
+  // ============ BALANCE HOLD ERRORS (61xx) ============
+  PAY_6101: {
+    code: "PAY_6101",
+    httpStatus: 400,
+    userMessage: "Insufficient available balance",
+    internalMessage: "Available balance (wallet - holds) insufficient for transaction",
+    category: "Payment",
+  },
+  PAY_6102: {
+    code: "PAY_6102",
+    httpStatus: 404,
+    userMessage: "Balance hold not found",
+    internalMessage: "Balance hold record does not exist",
+    category: "Payment",
+  },
+  PAY_6103: {
+    code: "PAY_6103",
+    httpStatus: 400,
+    userMessage: "Balance hold already processed",
+    internalMessage: "Cannot modify already released/confirmed hold",
+    category: "Payment",
+  },
+  PAY_6104: {
+    code: "PAY_6104",
+    httpStatus: 400,
+    userMessage: "Failed to hold balance",
+    internalMessage: "Balance hold operation failed",
+    category: "Payment",
+  },
+  PAY_6105: {
+    code: "PAY_6105",
+    httpStatus: 400,
+    userMessage: "Failed to release balance hold",
+    internalMessage: "Balance hold release operation failed",
+    category: "Payment",
+  },
+  PAY_6106: {
+    code: "PAY_6106",
+    httpStatus: 400,
+    userMessage: "Failed to confirm balance hold",
+    internalMessage: "Balance hold confirmation failed",
+    category: "Payment",
+  },
+  PAY_6107: {
+    code: "PAY_6107",
+    httpStatus: 400,
+    userMessage: "Balance hold has expired",
+    internalMessage: "Balance hold expired and was released",
+    category: "Payment",
+  },
+
   // ============ VALIDATION ERRORS (7xxx) ============
   VAL_7001: {
     code: "VAL_7001",
