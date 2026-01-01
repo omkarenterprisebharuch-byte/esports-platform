@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { LoaderProvider, Loader, NavigationLoader } from "@/components/ui/Loader";
+import { LoaderProvider, Loader } from "@/components/ui/Loader";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { RegistrationCacheProvider, clearRegistrationCache, useIdleTimeout, clearSessionData } from "@/hooks";
 import { api, logout, isAuthenticated } from "@/lib/api-client";
@@ -412,10 +412,7 @@ export default function DashboardLayout({
         </div>
       )}
       
-      {/* Navigation Loader - shows during page transitions */}
-      <Suspense fallback={null}>
-        <NavigationLoader />
-      </Suspense>
+
       </div>
       </RegistrationCacheProvider>
     </LoaderProvider>

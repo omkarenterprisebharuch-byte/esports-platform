@@ -5,6 +5,7 @@ import { ThemeProvider, themeScript } from "@/contexts/ThemeContext";
 import { PWAProvider } from "@/components/pwa";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { NavigationLoader } from "@/components/ui/Loader";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -68,6 +69,7 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
           <PWAProvider>
+            <NavigationLoader />
             {children}
           </PWAProvider>
         </ThemeProvider>

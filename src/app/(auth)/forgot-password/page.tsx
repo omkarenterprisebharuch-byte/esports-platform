@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp, new_password: password }),
+        body: JSON.stringify({ email, otp, newPassword: password }),
       });
 
       const data = await res.json();
@@ -141,12 +141,13 @@ export default function ForgotPasswordPage() {
               <input
                 type="text"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                onChange={(e) => setOtp(e.target.value.toUpperCase())}
                 required
                 maxLength={6}
-                placeholder="Enter 6-digit OTP"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-center text-2xl tracking-widest"
+                placeholder="Enter 6-character code"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-center text-2xl tracking-widest uppercase"
               />
+              <p className="text-xs text-gray-500 mt-1">Check your email for the code (letters and numbers)</p>
             </div>
 
             <div>

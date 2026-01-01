@@ -296,14 +296,15 @@ export default function RegisterPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="Enter 6-digit OTP"
+                  placeholder="Enter 6-character code"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-center text-2xl tracking-widest font-mono text-gray-900 bg-white placeholder:text-gray-400"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent outline-none transition text-center text-2xl tracking-widest font-mono text-gray-900 bg-white placeholder:text-gray-400 uppercase"
                   maxLength={6}
                   required
                   autoComplete="one-time-code"
                 />
+                <p className="text-xs text-gray-500 mt-1">Check your email for the code (letters and numbers)</p>
               </div>
 
               <button
