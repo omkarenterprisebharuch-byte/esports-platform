@@ -45,7 +45,7 @@ const menuItems = [
   { icon: "🏆", label: "Hall of Fame", href: "/hall-of-fame" },
   { icon: "👥", label: "My Teams", href: "/my-teams" },
   { icon: "👥", label: "My Registrations", href: "/my-registrations" },
-  { icon: "💰", label: "Wallet", href: "/wallet", disabled: true },
+  { icon: "💰", label: "Wallet", href: "/wallet" },
 ];
 
 export default function DashboardLayout({
@@ -223,14 +223,12 @@ export default function DashboardLayout({
           {menuItems.map((item, idx) => (
             <Link
               key={idx}
-              href={item.disabled ? "#" : item.href}
-              onClick={() => !item.disabled && setSidebarOpen(false)}
+              href={item.href}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
                 pathname === item.href
                   ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
-                  : item.disabled
-                    ? "opacity-50 cursor-not-allowed text-gray-500 dark:text-gray-400"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
             >
               <span>{item.icon}</span>
@@ -238,11 +236,6 @@ export default function DashboardLayout({
               {item.label === "My Teams" && teamsCount > 0 && (
                 <span className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-2 py-0.5 rounded-full">
                   {teamsCount}
-                </span>
-              )}
-              {item.disabled && (
-                <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs px-2 py-0.5 rounded-full">
-                  Soon
                 </span>
               )}
             </Link>
@@ -302,13 +295,11 @@ export default function DashboardLayout({
           {menuItems.map((item, idx) => (
             <Link
               key={idx}
-              href={item.disabled ? "#" : item.href}
+              href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
                 pathname === item.href
                   ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white font-medium"
-                  : item.disabled
-                    ? "opacity-50 cursor-not-allowed text-gray-500 dark:text-gray-400"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
               }`}
             >
               <span>{item.icon}</span>
@@ -316,11 +307,6 @@ export default function DashboardLayout({
               {item.label === "My Teams" && teamsCount > 0 && (
                 <span className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-2 py-0.5 rounded-full">
                   {teamsCount}
-                </span>
-              )}
-              {item.disabled && (
-                <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs px-2 py-0.5 rounded-full">
-                  Soon
                 </span>
               )}
             </Link>
