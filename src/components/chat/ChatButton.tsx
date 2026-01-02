@@ -26,7 +26,7 @@ export default function ChatButton({
       const tournamentEnd = new Date(tournamentEndDate);
 
       if (!isRegistered) {
-        setChatStatus("Register to access chat");
+        setChatStatus("Register to access chat & updates");
         setCanChat(false);
         return;
       }
