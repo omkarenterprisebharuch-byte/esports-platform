@@ -3,8 +3,9 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider, themeScript } from "@/contexts/ThemeContext";
 import { PWAProvider } from "@/components/pwa";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+// Analytics components disabled for local development due to webpack issues
+// import { Analytics } from "@vercel/analytics/react";
+// import { SpeedInsights } from "@vercel/speed-insights/next";
 import { NavigationLoader } from "@/components/ui/Loader";
 
 const inter = Inter({
@@ -73,8 +74,9 @@ export default function RootLayout({
             {children}
           </PWAProvider>
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
+        {/* Analytics disabled for local dev */}
+        {/* <Analytics /> */}
+        {/* <SpeedInsights /> */}
       </body>
     </html>
   );

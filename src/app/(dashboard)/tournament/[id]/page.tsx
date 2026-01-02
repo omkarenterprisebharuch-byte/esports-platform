@@ -195,26 +195,43 @@ export default function TournamentDetailsPage() {
       const data = await res.json();
 
       if (res.ok) {
+        // Update states immediately to show registered status
+        setServerRegistered(true);
+        setRegistering(false); // Stop showing "Registering..." immediately
+        
         setMessage({
           type: "success",
           text: `Successfully registered! Your slot number is #${data.data.slot_number}`,
         });
         addRegistration(tournamentId);
         
-        // Refresh tournament data for updated team count
-        const refreshRes = await fetch(`/api/tournaments/${params.id}`, {
+        // Pre-fetch chat data so chat is ready when user clicks (background)
+        fetch("/api/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
+        }).then(r => r.json()).then(d => {
+          if (d.success) {
+            setCurrentUserId(d.data.id);
+            setChatParticipants({
+              registeredUserIds: [d.data.id], // At minimum, current user is registered
+              tournamentEndDate: tournament.tournament_end_date.toString(),
+            });
+          }
         });
-        const refreshData = await refreshRes.json();
-        if (refreshData.success) {
-          setTournament(refreshData.data.tournament);
-        }
+        
+        // Refresh tournament data for updated team count (background)
+        fetch(`/api/tournaments/${params.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).then(r => r.json()).then(refreshData => {
+          if (refreshData.success) {
+            setTournament(refreshData.data.tournament);
+          }
+        });
       } else {
         setMessage({ type: "error", text: data.message });
+        setRegistering(false);
       }
     } catch {
       setMessage({ type: "error", text: "Registration failed" });
-    } finally {
       setRegistering(false);
     }
   };

@@ -16,8 +16,8 @@ interface QueuedRequest {
 
 const connectionQueue: QueuedRequest[] = [];
 let activeConnections = 0;
-const MAX_CONNECTIONS = 3;
-const QUEUE_TIMEOUT = 30000; // 30 seconds max wait in queue
+const MAX_CONNECTIONS = 10; // Neon has more capacity than Aiven free tier
+const QUEUE_TIMEOUT = 5000; // 5 seconds max wait in queue for better UX
 
 // Parse DATABASE_URL if available, otherwise use individual vars
 function getPoolConfig(): PoolConfig {

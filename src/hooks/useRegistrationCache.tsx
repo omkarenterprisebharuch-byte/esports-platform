@@ -23,8 +23,10 @@ interface RegistrationCacheContextType {
   fetched: boolean;
   /** Check if user is registered for a specific tournament */
   isRegistered: (tournamentId: string | number) => boolean;
-  /** Force refresh the registration cache */
+  /** Force refresh the registration cache from server (makes API call) */
   refresh: () => Promise<void>;
+  /** Sync cache from already-fetched data (no API call) */
+  syncFromData: (tournamentIds: (string | number)[]) => void;
   /** Add a tournament ID to the cache (after successful registration) */
   addRegistration: (tournamentId: string | number) => void;
   /** Remove a tournament ID from the cache (after cancellation) */
@@ -32,9 +34,6 @@ interface RegistrationCacheContextType {
 }
 
 const RegistrationCacheContext = createContext<RegistrationCacheContextType | undefined>(undefined);
-
-// Revalidation interval reference
-let revalidationTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Fetch registration IDs from server
@@ -111,27 +110,9 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
           setFetched(true);
         }
 
-        // Check if we need to sync with server
-        if (needsRevalidation()) {
-          // Sync in background (non-blocking)
-          syncWithServer(fetchRegistrationIdsFromServer).then((serverIds) => {
-            if (mountedRef.current) {
-              setRegisteredIds(serverIds);
-            }
-          });
-        }
-
-        // Set up periodic revalidation (every 10 minutes)
-        if (!revalidationTimer) {
-          revalidationTimer = setInterval(async () => {
-            if (isAuthenticated() && mountedRef.current) {
-              const serverIds = await syncWithServer(fetchRegistrationIdsFromServer);
-              if (mountedRef.current) {
-                setRegisteredIds(serverIds);
-              }
-            }
-          }, 10 * 60 * 1000);
-        }
+        // On-demand sync: Server sync only happens when user explicitly calls refresh()
+        // This saves database calls - IndexedDB cache is used as primary source
+        // Sync will be triggered when user visits My Registrations page
       } catch (error) {
         console.error("Failed to initialize registration cache:", error);
         if (mountedRef.current) {
@@ -152,10 +133,6 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
   useEffect(() => {
     return () => {
       cleanupRegistrationCache();
-      if (revalidationTimer) {
-        clearInterval(revalidationTimer);
-        revalidationTimer = null;
-      }
     };
   }, []);
 
@@ -204,6 +181,16 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
     }
   }, []);
 
+  // Sync cache from already-fetched data (avoids duplicate API calls)
+  const syncFromData = useCallback((tournamentIds: (string | number)[]) => {
+    const ids = tournamentIds.map(id => String(id));
+    const newSet = new Set(ids);
+    setRegisteredIds(newSet);
+    
+    // Update IndexedDB cache in background
+    syncWithServer(() => Promise.resolve(ids));
+  }, []);
+
   return (
     <RegistrationCacheContext.Provider
       value={{
@@ -212,6 +199,7 @@ export function RegistrationCacheProvider({ children }: { children: ReactNode })
         fetched,
         isRegistered,
         refresh,
+        syncFromData,
         addRegistration,
         removeRegistration,
       }}

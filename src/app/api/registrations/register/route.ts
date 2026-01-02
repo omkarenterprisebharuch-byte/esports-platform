@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import pool, { withTransaction } from "@/lib/db";
-import { getUserFromRequest, requireEmailVerified } from "@/lib/auth";
+import { withTransaction } from "@/lib/db";
+import { requireEmailVerified } from "@/lib/auth";
 import {
   successResponse,
   errorResponse,
@@ -13,12 +13,8 @@ import { validateWithSchema, validationErrorResponse, uuidSchema } from "@/lib/v
 import {
   calculateWaitlistSlots,
   isWaitlistAvailable,
-  addToWaitlist,
-  getWaitlistStatus,
 } from "@/lib/waitlist";
-import { isGameIdBanned, getBanMessage, checkMultipleGameIds } from "@/lib/ban-check";
 import { invalidateDbCache } from "@/lib/db-cache";
-import { getWalletBalance, debitWallet, holdBalance, getAvailableBalance } from "@/lib/wallet";
 
 // Schema for tournament registration
 const registerTournamentSchema = z.object({
@@ -26,18 +22,27 @@ const registerTournamentSchema = z.object({
   team_id: uuidSchema.optional().nullable(),
   selected_players: z.array(uuidSchema).optional().nullable(),
   backup_players: z.array(uuidSchema).optional().nullable(),
-  join_waitlist: z.boolean().optional().default(false), // New: explicitly request waitlist
+  join_waitlist: z.boolean().optional().default(false),
 });
+
+// Custom error class for validation errors that should return specific responses
+class ValidationError extends Error {
+  constructor(message: string, public statusCode: number = 400, public data?: unknown) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
 
 /**
  * POST /api/registrations/register
  * Register for a tournament
  * Requires email verification
+ * Uses single connection for entire operation to avoid pool exhaustion
  */
 export async function POST(request: NextRequest) {
   try {
     // Check authentication and email verification
-    const { user, verified, error } = requireEmailVerified(request);
+    const { user, verified } = requireEmailVerified(request);
 
     if (!user) {
       return unauthorizedResponse();
@@ -59,126 +64,147 @@ export async function POST(request: NextRequest) {
     
     const { tournament_id, team_id, selected_players, backup_players, join_waitlist } = validation.data;
 
+    // ============ SINGLE TRANSACTION FOR ALL OPERATIONS ============
+    // Uses only ONE connection from the pool for the entire registration flow
     const result = await withTransaction(async (client) => {
-      // Get tournament details
-      const tournamentResult = await client.query(
-        `SELECT * FROM tournaments WHERE id = $1`,
-        [tournament_id]
+      // Step 1: Fetch all required data in one query
+      const dataResult = await client.query(
+        `SELECT 
+          t.*,
+          t.current_teams,
+          t.max_teams,
+          u.id as user_db_id,
+          u.username,
+          u.in_game_ids,
+          u.wallet_balance,
+          u.hold_balance,
+          (SELECT COUNT(*) FROM tournament_registrations 
+           WHERE tournament_id = $1 AND is_waitlisted = TRUE AND status != 'cancelled') as waitlist_count,
+          (SELECT id FROM tournament_registrations 
+           WHERE tournament_id = $1 AND user_id = $2 AND status != 'cancelled' LIMIT 1) as existing_reg_id,
+          (SELECT is_waitlisted FROM tournament_registrations 
+           WHERE tournament_id = $1 AND user_id = $2 AND status != 'cancelled' LIMIT 1) as existing_is_waitlisted
+         FROM tournaments t
+         CROSS JOIN users u
+         WHERE t.id = $1 AND u.id = $2`,
+        [tournament_id, user.id]
       );
 
-      if (tournamentResult.rows.length === 0) {
-        throw new Error("Tournament not found");
+      if (dataResult.rows.length === 0) {
+        throw new ValidationError("Tournament not found", 404);
       }
 
-      const tournament = tournamentResult.rows[0];
-
-      // Check tournament status
-      if (
-        tournament.status !== "registration_open" &&
-        tournament.status !== "upcoming"
-      ) {
-        throw new Error("Registration is not open for this tournament");
-      }
-
-      // Check if slots are available OR if waitlist should be used
-      const isFull = tournament.current_teams >= tournament.max_teams;
+      const row = dataResult.rows[0];
       
-      if (isFull) {
-        // Tournament is full - check if waitlist is available
-        const waitlistCheck = isWaitlistAvailable(
-          tournament.tournament_start_date,
-          tournament.current_teams,
-          tournament.max_teams
-        );
-
-        if (!waitlistCheck.available) {
-          throw new Error("Tournament is full");
-        }
-
-        // Check if user explicitly requested waitlist or we should offer it
-        if (!join_waitlist) {
-          // Return info about waitlist availability
-          const waitlistStatus = await getWaitlistStatus(tournament_id);
-          throw new Error(
-            `WAITLIST_AVAILABLE:${waitlistStatus.maxWaitlistSlots}:${waitlistStatus.currentWaitlistCount}`
-          );
-        }
-
-        // User wants to join waitlist
-        const waitlistStatus = await getWaitlistStatus(tournament_id);
-        if (waitlistStatus.isWaitlistFull) {
-          throw new Error("Tournament and waitlist are both full");
-        }
+      if (!row.user_db_id) {
+        throw new ValidationError("User not found", 404);
       }
 
-      // Get user profile
-      const userResult = await client.query(
-        `SELECT id, username, in_game_ids FROM users WHERE id = $1`,
-        [user.id]
-      );
-      const dbUser = userResult.rows[0];
+      // Check existing registration
+      if (row.existing_reg_id) {
+        if (row.existing_is_waitlisted) {
+          throw new ValidationError("Already on waitlist");
+        }
+        throw new ValidationError("Already registered for this tournament");
+      }
+
+      const tournament = {
+        id: row.id,
+        tournament_name: row.tournament_name,
+        game_type: row.game_type,
+        tournament_type: row.tournament_type,
+        entry_fee: parseFloat(row.entry_fee) || 0,
+        status: row.status,
+        current_teams: row.current_teams,
+        max_teams: row.max_teams,
+        tournament_start_date: row.tournament_start_date,
+      };
+      
+      const dbUser = {
+        id: row.user_db_id,
+        username: row.username,
+        in_game_ids: row.in_game_ids,
+        wallet_balance: parseFloat(row.wallet_balance) || 0,
+        hold_balance: parseFloat(row.hold_balance) || 0,
+      };
+      
+      const waitlistCount = parseInt(row.waitlist_count) || 0;
+      const gameType = tournament.game_type;
+      const tournamentType = tournament.tournament_type;
+      const entryFee = tournament.entry_fee;
+
+      // Step 2: Validation checks
+      if (tournament.status !== "registration_open" && tournament.status !== "upcoming") {
+        throw new ValidationError("Registration is not open for this tournament");
+      }
 
       // Validate game UID
-      const gameType = tournament.game_type;
       const userGameId = dbUser.in_game_ids?.[gameType];
-
       if (!userGameId) {
-        throw new Error(
+        throw new ValidationError(
           `Please add your ${gameType.toUpperCase()} game ID in your profile before registering`
         );
       }
 
-      // Check if user's game ID is banned
-      const banStatus = await isGameIdBanned(userGameId, gameType);
-      if (banStatus.banned) {
-        throw new Error(getBanMessage(banStatus));
+      // Check available balance
+      const availableBalance = Math.max(0, dbUser.wallet_balance - dbUser.hold_balance);
+      if (entryFee > 0 && availableBalance < entryFee) {
+        throw new ValidationError(
+          `Insufficient available balance. Entry fee: ₹${entryFee}, Your available balance: ₹${availableBalance.toFixed(2)}. Please add funds to your wallet.`
+        );
       }
 
-      const tournamentType = tournament.tournament_type;
+      // Step 3: Lock tournament row and recheck capacity
+      const lockResult = await client.query(
+        `SELECT current_teams, max_teams FROM tournaments WHERE id = $1 FOR UPDATE`,
+        [tournament_id]
+      );
+      const currentTeams = lockResult.rows[0].current_teams;
+      const maxTeams = lockResult.rows[0].max_teams;
+      const isFull = currentTeams >= maxTeams;
 
-      // Check entry fee requirement (applies to both solo and team registrations)
-      const entryFee = parseFloat(tournament.entry_fee) || 0;
+      // Handle full tournament
+      if (isFull) {
+        const waitlistCheck = isWaitlistAvailable(
+          tournament.tournament_start_date,
+          currentTeams,
+          maxTeams
+        );
+
+        if (!waitlistCheck.available) {
+          throw new ValidationError("Tournament is full");
+        }
+
+        if (!join_waitlist) {
+          const maxWaitlistSlots = calculateWaitlistSlots(maxTeams);
+          throw new ValidationError(
+            `WAITLIST_AVAILABLE:${maxWaitlistSlots}:${waitlistCount}`,
+            400,
+            { waitlist_available: true, waitlist_slots_total: maxWaitlistSlots, waitlist_slots_taken: waitlistCount }
+          );
+        }
+
+        const maxWaitlistSlots = calculateWaitlistSlots(maxTeams);
+        if (waitlistCount >= maxWaitlistSlots) {
+          throw new ValidationError("Tournament and waitlist are both full");
+        }
+      }
+
+      // Step 4: Process registration based on tournament type
       let entryFeeDeducted = false;
       let entryFeeHeld = false;
 
-      if (entryFee > 0) {
-        // Check if the registering player has sufficient AVAILABLE balance
-        // (Available = wallet_balance - hold_balance)
-        const availableBalance = await getAvailableBalance(user.id);
-        if (availableBalance < entryFee) {
-          throw new Error(
-            `Insufficient available balance. Entry fee: ₹${entryFee}, Your available balance: ₹${availableBalance.toFixed(2)}. Please add funds to your wallet.`
-          );
-        }
-      }
-
       if (tournamentType === "solo") {
         // SOLO REGISTRATION
-        const existingReg = await client.query(
-          `SELECT id, is_waitlisted FROM tournament_registrations 
-           WHERE tournament_id = $1 AND user_id = $2 AND status != 'cancelled'`,
-          [tournament_id, user.id]
-        );
-
-        if (existingReg.rows.length > 0) {
-          if (existingReg.rows[0].is_waitlisted) {
-            throw new Error("Already on waitlist");
-          }
-          throw new Error("Registered");
-        }
-
-        // Handle waitlist registration
         if (isFull && join_waitlist) {
-          // Get next waitlist position
+          // Waitlist registration
           const positionResult = await client.query(
             `SELECT COALESCE(MAX(waitlist_position), 0) + 1 as next_position 
-             FROM tournament_registrations 
-             WHERE tournament_id = $1 AND is_waitlisted = TRUE`,
+             FROM tournament_registrations WHERE tournament_id = $1 AND is_waitlisted = TRUE`,
             [tournament_id]
           );
           const waitlistPosition = positionResult.rows[0].next_position;
 
-          // Create waitlist registration
           const regResult = await client.query(
             `INSERT INTO tournament_registrations 
              (tournament_id, user_id, registration_type, status, is_waitlisted, waitlist_position)
@@ -187,15 +213,18 @@ export async function POST(request: NextRequest) {
             [tournament_id, user.id, waitlistPosition]
           );
 
-          // Hold entry fee for waitlist registration (will be deducted when slot is confirmed)
+          // Hold entry fee for waitlist
           if (entryFee > 0) {
-            await holdBalance(
-              user.id,
-              entryFee,
-              "waitlist_entry_fee",
-              "tournament_registration",
-              regResult.rows[0].id.toString(),
-              `Entry fee hold for waitlist: ${tournament.tournament_name}`
+            const newHoldBalance = dbUser.hold_balance + entryFee;
+            await client.query(
+              "UPDATE users SET hold_balance = $1, updated_at = NOW() WHERE id = $2",
+              [newHoldBalance, user.id]
+            );
+            await client.query(
+              `INSERT INTO balance_holds 
+               (user_id, amount, hold_type, status, reference_type, reference_id, description)
+               VALUES ($1, $2, 'waitlist_entry_fee', 'active', 'tournament_registration', $3, $4)`,
+              [user.id, entryFee, regResult.rows[0].id.toString(), `Entry fee hold for waitlist: ${tournament.tournament_name}`]
             );
             entryFeeHeld = true;
           }
@@ -209,8 +238,7 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        // Regular registration
-        // Get next slot number
+        // Regular solo registration
         const slotResult = await client.query(
           `SELECT COALESCE(MAX(slot_number), 0) + 1 as next_slot 
            FROM tournament_registrations WHERE tournament_id = $1 AND is_waitlisted = FALSE`,
@@ -218,7 +246,6 @@ export async function POST(request: NextRequest) {
         );
         const slotNumber = slotResult.rows[0].next_slot;
 
-        // Create solo registration
         const regResult = await client.query(
           `INSERT INTO tournament_registrations 
            (tournament_id, user_id, registration_type, slot_number, status, is_waitlisted)
@@ -227,20 +254,23 @@ export async function POST(request: NextRequest) {
           [tournament_id, user.id, slotNumber]
         );
 
-        // Update tournament team count
         await client.query(
           `UPDATE tournaments SET current_teams = current_teams + 1 WHERE id = $1`,
           [tournament_id]
         );
 
-        // Deduct entry fee from registering player's wallet
+        // Deduct entry fee
         if (entryFee > 0) {
-          await debitWallet(
-            user.id,
-            entryFee,
-            "entry_fee",
-            `Entry fee for tournament: ${tournament.tournament_name}`,
-            tournament_id
+          const balanceAfter = dbUser.wallet_balance - entryFee;
+          await client.query(
+            "UPDATE users SET wallet_balance = $1, updated_at = NOW() WHERE id = $2",
+            [balanceAfter, user.id]
+          );
+          await client.query(
+            `INSERT INTO wallet_transactions 
+             (user_id, amount, type, status, description, reference_id, balance_before, balance_after)
+             VALUES ($1, $2, 'entry_fee', 'completed', $3, $4, $5, $6)`,
+            [user.id, -entryFee, `Entry fee for tournament: ${tournament.tournament_name}`, tournament_id, dbUser.wallet_balance, balanceAfter]
           );
           entryFeeDeducted = true;
         }
@@ -254,105 +284,102 @@ export async function POST(request: NextRequest) {
       } else {
         // DUO/SQUAD REGISTRATION
         if (!team_id) {
-          throw new Error(
-            `Team ID is required for ${tournamentType} tournaments`
-          );
+          throw new ValidationError(`Team ID is required for ${tournamentType} tournaments`);
         }
 
-        // Check if user is team member
         const memberCheck = await client.query(
           `SELECT id FROM team_members WHERE team_id = $1 AND user_id = $2 AND left_at IS NULL`,
           [team_id, user.id]
         );
-
         if (memberCheck.rows.length === 0) {
-          throw new Error("You are not a member of this team");
+          throw new ValidationError("You are not a member of this team");
         }
 
-        // Get all selected players' game IDs and check for bans
-        const playerIds = selected_players || [user.id];
-        const playersResult = await client.query(
-          `SELECT u.id, u.username, u.in_game_ids 
-           FROM users u 
-           WHERE u.id = ANY($1::int[])`,
-          [playerIds]
-        );
-
-        // Check each player's game ID for bans
-        const gameIdsToCheck = playersResult.rows
-          .filter(p => p.in_game_ids?.[gameType])
-          .map(p => ({
-            gameId: p.in_game_ids[gameType],
-            gameType: gameType,
-            username: p.username,
-          }));
-
-        if (gameIdsToCheck.length > 0) {
-          const banResults = await checkMultipleGameIds(
-            gameIdsToCheck.map(g => ({ gameId: g.gameId, gameType: g.gameType }))
-          );
-
-          for (const { gameId, gameType: gType, username } of gameIdsToCheck) {
-            const banStatus = banResults.get(`${gameId}:${gType}`);
-            if (banStatus?.banned) {
-              throw new Error(
-                `Player "${username}" cannot participate: ${getBanMessage(banStatus)}`
-              );
-            }
-          }
-        }
-
-        // Check if team already registered or on waitlist
+        // Check team already registered
         const existingTeamReg = await client.query(
           `SELECT id, is_waitlisted FROM tournament_registrations 
            WHERE tournament_id = $1 AND team_id = $2 AND status != 'cancelled'`,
           [tournament_id, team_id]
         );
-
         if (existingTeamReg.rows.length > 0) {
           if (existingTeamReg.rows[0].is_waitlisted) {
-            throw new Error("This team is already on the waitlist");
+            throw new ValidationError("This team is already on the waitlist");
           }
-          throw new Error("This team is already registered for this tournament");
+          throw new ValidationError("This team is already registered for this tournament");
         }
 
-        // Handle waitlist registration
+        // Check selected players for bans - inline query using transaction client
+        const playerIds = selected_players || [user.id];
+        const playersResult = await client.query(
+          `SELECT u.id, u.username, u.in_game_ids FROM users u WHERE u.id = ANY($1::int[])`,
+          [playerIds]
+        );
+
+        const gameIdsToCheck = playersResult.rows
+          .filter((p: { in_game_ids?: Record<string, string> }) => p.in_game_ids?.[gameType])
+          .map((p: { in_game_ids: Record<string, string>; username: string }) => ({
+            gameId: p.in_game_ids[gameType],
+            gameType: gameType,
+            username: p.username,
+          }));
+
+        // Inline ban check using transaction client to avoid separate pool connection
+        if (gameIdsToCheck.length > 0) {
+          const banConditions = gameIdsToCheck.map((_: unknown, i: number) => `(game_id = $${i * 2 + 1} AND game_type = $${i * 2 + 2})`);
+          const banParams = gameIdsToCheck.flatMap((g: { gameId: string; gameType: string }) => [g.gameId, g.gameType]);
+          
+          const banResult = await client.query(
+            `SELECT game_id, game_type, reason, is_permanent, ban_expires_at 
+             FROM banned_game_ids
+             WHERE (${banConditions.join(" OR ")})
+             AND is_active = TRUE
+             AND (is_permanent = TRUE OR ban_expires_at > NOW())`,
+            banParams
+          );
+          
+          // Check if any players are banned
+          for (const banRow of banResult.rows) {
+            const bannedPlayer = gameIdsToCheck.find((g: { gameId: string; gameType: string }) => 
+              g.gameId === banRow.game_id && g.gameType === banRow.game_type
+            );
+            if (bannedPlayer) {
+              const banMessage = banRow.is_permanent
+                ? `permanently banned: ${banRow.reason || 'Violation of platform rules'}`
+                : `temporarily banned until ${new Date(banRow.ban_expires_at).toLocaleDateString()}: ${banRow.reason || 'Violation of platform rules'}`;
+              throw new ValidationError(`Player "${bannedPlayer.username}" cannot participate - ${banMessage}`);
+            }
+          }
+        }
+
         if (isFull && join_waitlist) {
-          // Get next waitlist position
+          // Waitlist team registration
           const positionResult = await client.query(
             `SELECT COALESCE(MAX(waitlist_position), 0) + 1 as next_position 
-             FROM tournament_registrations 
-             WHERE tournament_id = $1 AND is_waitlisted = TRUE`,
+             FROM tournament_registrations WHERE tournament_id = $1 AND is_waitlisted = TRUE`,
             [tournament_id]
           );
           const waitlistPosition = positionResult.rows[0].next_position;
 
-          // Create waitlist registration
           const regResult = await client.query(
             `INSERT INTO tournament_registrations 
              (tournament_id, team_id, user_id, registration_type, status, is_waitlisted, waitlist_position, selected_players, backup_players)
              VALUES ($1, $2, $3, $4, 'registered', TRUE, $5, $6, $7)
              RETURNING *`,
-            [
-              tournament_id,
-              team_id,
-              user.id,
-              tournamentType,
-              waitlistPosition,
-              JSON.stringify(selected_players || [user.id]),
-              JSON.stringify(backup_players || []),
-            ]
+            [tournament_id, team_id, user.id, tournamentType, waitlistPosition,
+             JSON.stringify(selected_players || [user.id]), JSON.stringify(backup_players || [])]
           );
 
-          // Hold entry fee for waitlist registration (will be deducted when slot is confirmed)
           if (entryFee > 0) {
-            await holdBalance(
-              user.id,
-              entryFee,
-              "waitlist_entry_fee",
-              "tournament_registration",
-              regResult.rows[0].id.toString(),
-              `Entry fee hold for waitlist: ${tournament.tournament_name} (Team registration)`
+            const newHoldBalance = dbUser.hold_balance + entryFee;
+            await client.query(
+              "UPDATE users SET hold_balance = $1, updated_at = NOW() WHERE id = $2",
+              [newHoldBalance, user.id]
+            );
+            await client.query(
+              `INSERT INTO balance_holds 
+               (user_id, amount, hold_type, status, reference_type, reference_id, description)
+               VALUES ($1, $2, 'waitlist_entry_fee', 'active', 'tournament_registration', $3, $4)`,
+              [user.id, entryFee, regResult.rows[0].id.toString(), `Entry fee hold for waitlist: ${tournament.tournament_name}`]
             );
             entryFeeHeld = true;
           }
@@ -366,7 +393,7 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        // Regular registration - get next slot number
+        // Regular team registration
         const slotResult = await client.query(
           `SELECT COALESCE(MAX(slot_number), 0) + 1 as next_slot 
            FROM tournament_registrations WHERE tournament_id = $1 AND is_waitlisted = FALSE`,
@@ -374,38 +401,31 @@ export async function POST(request: NextRequest) {
         );
         const slotNumber = slotResult.rows[0].next_slot;
 
-        // Create team registration
         const regResult = await client.query(
           `INSERT INTO tournament_registrations 
            (tournament_id, team_id, user_id, registration_type, slot_number, selected_players, backup_players, status, is_waitlisted)
            VALUES ($1, $2, $3, $4, $5, $6, $7, 'registered', FALSE)
            RETURNING *`,
-          [
-            tournament_id,
-            team_id,
-            user.id,
-            tournamentType,
-            slotNumber,
-            JSON.stringify(selected_players || [user.id]),
-            JSON.stringify(backup_players || []),
-          ]
+          [tournament_id, team_id, user.id, tournamentType, slotNumber,
+           JSON.stringify(selected_players || [user.id]), JSON.stringify(backup_players || [])]
         );
 
-        // Update tournament team count
         await client.query(
           `UPDATE tournaments SET current_teams = current_teams + 1 WHERE id = $1`,
           [tournament_id]
         );
 
-        // Deduct entry fee from registering player (captain) wallet
-        // For squad/duo matches, only the player doing registration pays
         if (entryFee > 0) {
-          await debitWallet(
-            user.id,
-            entryFee,
-            "entry_fee",
-            `Entry fee for tournament: ${tournament.tournament_name} (Team registration)`,
-            tournament_id
+          const balanceAfter = dbUser.wallet_balance - entryFee;
+          await client.query(
+            "UPDATE users SET wallet_balance = $1, updated_at = NOW() WHERE id = $2",
+            [balanceAfter, user.id]
+          );
+          await client.query(
+            `INSERT INTO wallet_transactions 
+             (user_id, amount, type, status, description, reference_id, balance_before, balance_after)
+             VALUES ($1, $2, 'entry_fee', 'completed', $3, $4, $5, $6)`,
+            [user.id, -entryFee, `Entry fee for tournament: ${tournament.tournament_name}`, tournament_id, dbUser.wallet_balance, balanceAfter]
           );
           entryFeeDeducted = true;
         }
@@ -419,31 +439,30 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // Customize success message based on waitlist status and entry fee
+    // Build success message
     let message = result.is_waitlisted
       ? `Added to waitlist at position ${result.waitlist_position}`
       : "Successfully registered for the tournament";
     
-    // Add entry fee info to message
     if (result.entry_fee_paid && result.entry_fee_paid > 0) {
       message += ` (₹${result.entry_fee_paid} deducted from wallet)`;
     } else if (result.entry_fee_held && result.entry_fee_held > 0) {
-      message += ` (₹${result.entry_fee_held} held from wallet - will be deducted when slot is confirmed)`;
+      message += ` (₹${result.entry_fee_held} held from wallet)`;
     }
 
-    // Invalidate registration-related caches
+    // Invalidate caches
     await invalidateDbCache.registration(user.id, tournament_id);
 
     return successResponse(result, message, 201);
   } catch (error) {
     console.error("Registration error:", error);
-    if (error instanceof Error) {
-      // Handle waitlist available error specially
+    
+    if (error instanceof ValidationError) {
+      // Handle waitlist available specially
       if (error.message.startsWith("WAITLIST_AVAILABLE:")) {
         const parts = error.message.split(":");
         const maxSlots = parseInt(parts[1]);
         const currentCount = parseInt(parts[2]);
-        // Return custom response with waitlist info
         return new Response(
           JSON.stringify({
             success: false,
@@ -456,12 +475,13 @@ export async function POST(request: NextRequest) {
               waitlist_slots_remaining: maxSlots - currentCount,
             },
           }),
-          {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          }
+          { status: 400, headers: { "Content-Type": "application/json" } }
         );
       }
+      return errorResponse(error.message, error.statusCode);
+    }
+    
+    if (error instanceof Error) {
       return errorResponse(error.message);
     }
     return serverErrorResponse(error);

@@ -35,7 +35,6 @@ interface User {
 
 // Module-level cache for user data - persists across navigations
 let cachedUser: User | null = null;
-let cachedTeamsCount: number = 0;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -55,7 +54,6 @@ export default function DashboardLayout({
 }) {
   const [user, setUser] = useState<User | null>(cachedUser);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [teamsCount, setTeamsCount] = useState(cachedTeamsCount);
   const [initialLoading, setInitialLoading] = useState(!cachedUser);
   const [showIdleWarning, setShowIdleWarning] = useState(false);
   const pathname = usePathname();
@@ -73,7 +71,6 @@ export default function DashboardLayout({
     onIdle: () => {
       // Clear caches before logout
       cachedUser = null;
-      cachedTeamsCount = 0;
       cacheTimestamp = 0;
     },
   });
@@ -90,17 +87,13 @@ export default function DashboardLayout({
     const now = Date.now();
     if (!forceRefresh && cachedUser && (now - cacheTimestamp) < CACHE_DURATION) {
       setUser(cachedUser);
-      setTeamsCount(cachedTeamsCount);
       setInitialLoading(false);
       return;
     }
 
     try {
-      // Fetch user and teams in parallel using secure API client
-      const [userData, teamsData] = await Promise.all([
-        api<User>("/api/auth/me"),
-        api<{ teams: unknown[] }>("/api/teams/my-teams"),
-      ]);
+      // Only fetch user data on page load - teams count fetched on-demand when needed
+      const userData = await api<User>("/api/auth/me");
 
       if (userData.success && userData.data) {
         cachedUser = userData.data;
@@ -112,11 +105,8 @@ export default function DashboardLayout({
         return;
       }
 
-      if (teamsData.success && teamsData.data) {
-        const count = teamsData.data.teams?.length || 0;
-        cachedTeamsCount = count;
-        setTeamsCount(count);
-      }
+      // Teams count will be fetched on-demand when user visits My Teams page
+      // This saves unnecessary API calls on every page load
     } catch {
       cachedUser = null;
       router.push("/login");
@@ -132,7 +122,6 @@ export default function DashboardLayout({
       if (cachedUser) {
         setInitialLoading(false);
         setUser(cachedUser);
-        setTeamsCount(cachedTeamsCount);
       } else {
         // No cached user and already tried to fetch, stop loading
         setInitialLoading(false);
@@ -160,7 +149,6 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     // Clear all caches
     cachedUser = null;
-    cachedTeamsCount = 0;
     cacheTimestamp = 0;
     // Clear session data (idle timeout tracking)
     clearSessionData();
@@ -233,11 +221,6 @@ export default function DashboardLayout({
             >
               <span>{item.icon}</span>
               <span className="flex-1">{item.label}</span>
-              {item.label === "My Teams" && teamsCount > 0 && (
-                <span className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-2 py-0.5 rounded-full">
-                  {teamsCount}
-                </span>
-              )}
             </Link>
           ))}
           {isAdminOrHost && (
@@ -304,11 +287,6 @@ export default function DashboardLayout({
             >
               <span>{item.icon}</span>
               <span className="flex-1">{item.label}</span>
-              {item.label === "My Teams" && teamsCount > 0 && (
-                <span className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-2 py-0.5 rounded-full">
-                  {teamsCount}
-                </span>
-              )}
             </Link>
           ))}
         </nav>

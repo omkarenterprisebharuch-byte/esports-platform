@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRegistrationCache } from "@/hooks";
 
 interface Registration {
   registration_id: number;
@@ -26,6 +27,7 @@ export default function MyRegistrationsPage() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCredentials, setShowCredentials] = useState<Record<number, boolean>>({});
+  const { syncFromData } = useRegistrationCache();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -36,11 +38,14 @@ export default function MyRegistrationsPage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          setRegistrations(data.data.registrations || []);
+          const regs = data.data.registrations || [];
+          setRegistrations(regs);
+          // Sync registration cache from fetched data (no extra API call)
+          syncFromData(regs.map((r: Registration) => r.tournament_id));
         }
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [syncFromData]);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "TBD";
