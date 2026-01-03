@@ -3,9 +3,16 @@ import type { NextRequest } from "next/server";
 
 // Paths that don't require authentication
 const publicPaths = [
+  "/",
   "/login",
   "/register",
   "/forgot-password",
+  "/home",
+  "/tournaments",
+  "/leaderboard",
+  "/hall-of-fame",
+  "/privacy-policy",
+  "/terms",
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/send-otp",
@@ -34,6 +41,18 @@ const csrfExemptPaths = [
 // Paths that require host/admin role
 const adminPaths = ["/admin"];
 
+// Paths that need auth - redirect to login with return URL
+const protectedPaths = [
+  "/dashboard",
+  "/profile",
+  "/my-teams",
+  "/my-registrations",
+  "/wallet",
+  "/register-tournament",
+  "/admin",
+  "/owner",
+];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -57,11 +76,16 @@ export function middleware(request: NextRequest) {
   if (isPublicPath && token && pathname !== "/api/auth/login" && pathname !== "/api/auth/logout") {
     // Don't redirect API routes
     if (!pathname.startsWith("/api/")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      // Don't redirect from public viewing pages (tournaments, leaderboard, home, root, etc.)
+      const viewingOnlyPaths = ["/", "/home", "/tournaments", "/leaderboard", "/hall-of-fame", "/privacy-policy", "/terms"];
+      const isViewingPath = viewingOnlyPaths.some(p => pathname === p || (p !== "/" && pathname.startsWith(p + "/")));
+      if (!isViewingPath) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
+      }
     }
   }
 
-  // If accessing a protected path without token, redirect to login
+  // If accessing a protected path without token, redirect to login with return URL
   // Skip for public API GET endpoints (they can be accessed without auth)
   if (!isPublicPath && !isPublicApiGet && !token) {
     // For API routes, return 401
@@ -69,8 +93,21 @@ export function middleware(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    // For pages, redirect to login
-    return NextResponse.redirect(new URL("/login", request.url));
+    // For pages, redirect to login with the original URL as redirect param
+    const loginUrl = new URL("/login", request.url);
+    
+    // Encode the full path (including query params) for redirect after login
+    const redirectPath = pathname + request.nextUrl.search;
+    loginUrl.searchParams.set("redirect", redirectPath);
+    
+    // Add a reason for better UX messaging
+    if (pathname.startsWith("/register-tournament")) {
+      loginUrl.searchParams.set("reason", "registration");
+    } else {
+      loginUrl.searchParams.set("reason", "protected");
+    }
+    
+    return NextResponse.redirect(loginUrl);
   }
 
   // CSRF validation for mutation requests on API routes

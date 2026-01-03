@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader } from "@/components/ui/Loader";
 
 type Step = "form" | "otp";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>("form");
   const [form, setForm] = useState({
     username: "",
@@ -24,6 +25,9 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Get redirect URL from query params
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +102,9 @@ export default function RegisterPage() {
       localStorage.setItem("user", JSON.stringify(data.data.user));
       document.cookie = `token=${data.data.token}; path=/; max-age=${7 * 24 * 60 * 60}`;
 
-      router.push("/dashboard");
+      // Redirect to the original destination or dashboard
+      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+      router.push(safeRedirect);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to verify OTP");
@@ -108,14 +114,25 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
       {/* Show blob loader overlay during registration */}
       {isLoading && <Loader message={step === "form" ? "Sending verification code..." : "Verifying..."} />}
       
       <div className="w-full max-w-md">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
+        {/* Back to home link */}
+        <Link 
+          href="/home" 
+          className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Home
+        </Link>
+
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               {step === "form" ? "Create Account" : "Verify Email"}
             </h1>
             <p className="text-gray-600">

@@ -1,18 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader } from "@/components/ui/Loader";
 import { ApiErrorDisplay, type ApiErrorInfo } from "@/components/ui/ApiErrorDisplay";
 import { secureFetch, setCachedUser } from "@/lib/api-client";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState({ email: "", password: "", remember_me: false });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiErrorInfo | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
+
+  // Get redirect URL from query params (used when redirecting from protected routes)
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
+  const reason = searchParams.get("reason");
+
+  useEffect(() => {
+    // Show a helpful message if user was redirected from a protected action
+    if (reason === "registration") {
+      setRedirectMessage("Please sign in to register for this tournament");
+    } else if (reason === "protected") {
+      setRedirectMessage("Please sign in to continue");
+    }
+  }, [reason]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +62,10 @@ export default function LoginPage() {
       localStorage.setItem("last_activity_timestamp", Date.now().toString());
       localStorage.setItem("session_active", "true");
 
-      router.push("/dashboard");
+      // Redirect to the original destination or dashboard
+      // Validate redirect URL to prevent open redirect attacks
+      const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/dashboard";
+      router.push(safeRedirect);
       router.refresh();
     } catch (err) {
       setError({
@@ -60,18 +78,41 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
       {/* Show blob loader overlay during login */}
       {isLoading && <Loader message="Signing you in..." />}
       
       <div className="w-full max-w-md">
-        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
+        {/* Back to home link */}
+        <Link 
+          href="/home" 
+          className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Home
+        </Link>
+
+        <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               Welcome Back
             </h1>
-            <p className="text-gray-600">Sign in to your account</p>
+            <p className="text-gray-600 dark:text-gray-400">Sign in to your account</p>
           </div>
+
+          {/* Redirect message */}
+          {redirectMessage && (
+            <div className="mb-6 px-4 py-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {redirectMessage}
+              </p>
+            </div>
+          )}
 
           {error && (
             <ApiErrorDisplay 
