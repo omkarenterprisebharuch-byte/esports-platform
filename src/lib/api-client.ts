@@ -23,7 +23,20 @@ function getCsrfToken(): string | null {
 
 // Track if we're currently refreshing to prevent multiple refresh calls
 let isRefreshing = false;
+
+// Track if we're logging out to prevent 401 redirects during logout
+let isLoggingOut = false;
 let refreshPromise: Promise<boolean> | null = null;
+
+// Export function to check if logout is in progress
+export function isLogoutInProgress(): boolean {
+  return isLoggingOut;
+}
+
+// Export function to set logout flag (allows synchronous flag setting before async operations)
+export function setLogoutInProgress(value: boolean): void {
+  isLoggingOut = value;
+}
 
 // Store user data (non-sensitive, for UI only)
 let cachedUser: { id: string; username: string; email: string; is_host: boolean } | null = null;
@@ -167,8 +180,8 @@ export async function api<T = unknown>(
     // Handle auth errors (after refresh attempt failed)
     if (response.status === 401) {
       clearCachedUser();
-      // Redirect to login if not already there
-      if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+      // Redirect to login if not already there and not logging out
+      if (typeof window !== "undefined" && !window.location.pathname.includes("/login") && !isLoggingOut) {
         window.location.href = "/login";
       }
     }
@@ -184,6 +197,9 @@ export async function api<T = unknown>(
  * Logout and clear all auth state
  */
 export async function logout(): Promise<void> {
+  // Set flag to prevent 401 redirects during logout
+  isLoggingOut = true;
+  
   try {
     await secureFetch("/api/auth/logout", { method: "POST", skipRefresh: true });
   } catch {
@@ -198,9 +214,9 @@ export async function logout(): Promise<void> {
     localStorage.removeItem("user");
   }
   
-  // Redirect to login
+  // Redirect to home
   if (typeof window !== "undefined") {
-    window.location.href = "/login";
+    window.location.replace("/home");
   }
 }
 

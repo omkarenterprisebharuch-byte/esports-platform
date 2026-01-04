@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { LoaderProvider, Loader } from "@/components/ui/Loader";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { RegistrationCacheProvider, clearRegistrationCache, useIdleTimeout, clearSessionData } from "@/hooks";
-import { api, logout, isAuthenticated } from "@/lib/api-client";
+import { api, logout, isAuthenticated, isLogoutInProgress, setLogoutInProgress } from "@/lib/api-client";
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { AppHeader } from "@/components/app/AppHeader";
 
@@ -66,6 +66,12 @@ export default function AppLayout({
   });
 
   const fetchUserData = useCallback(async (forceRefresh = false) => {
+    // Don't redirect if logout is in progress
+    if (isLogoutInProgress()) {
+      setInitialLoading(false);
+      return;
+    }
+    
     // Check if user is authenticated via cookie
     if (!isAuthenticated()) {
       setInitialLoading(false);
@@ -89,13 +95,19 @@ export default function AppLayout({
         cacheTimestamp = Date.now();
         setUser(userData.data);
       } else {
-        cachedUser = null;
-        router.push("/login");
+        // Don't redirect if logout is in progress
+        if (!isLogoutInProgress()) {
+          cachedUser = null;
+          router.push("/login");
+        }
         return;
       }
     } catch {
-      cachedUser = null;
-      router.push("/login");
+      // Don't redirect if logout is in progress
+      if (!isLogoutInProgress()) {
+        cachedUser = null;
+        router.push("/login");
+      }
     } finally {
       setInitialLoading(false);
     }
@@ -115,7 +127,7 @@ export default function AppLayout({
     
     // Safety timeout - prevent infinite loading screen
     const safetyTimeout = setTimeout(() => {
-      if (initialLoading) {
+      if (initialLoading && !isLogoutInProgress()) {
         console.warn("App loading timeout - redirecting to login");
         setInitialLoading(false);
         router.push("/login");
@@ -128,6 +140,9 @@ export default function AppLayout({
   }, [fetchUserData, initialLoading, router]);
 
   const handleLogout = async () => {
+    // Set flag synchronously BEFORE any async operations to prevent redirect races
+    setLogoutInProgress(true);
+    
     cachedUser = null;
     cacheTimestamp = 0;
     clearSessionData();

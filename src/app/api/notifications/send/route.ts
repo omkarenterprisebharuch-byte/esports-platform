@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       body: notificationBody,
       icon: "/favicon.ico",
       badge: "/favicon.ico",
-      url: url || (tournamentId ? `/tournament/${tournamentId}` : "/dashboard"),
+      url: url || (tournamentId ? `/tournament/${tournamentId}` : "/app"),
       tournamentId,
       type,
       requireInteraction: type === "room_credentials", // Important notifications stay visible

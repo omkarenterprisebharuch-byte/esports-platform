@@ -26,6 +26,12 @@ export async function POST(request: NextRequest) {
       return errorResponse("Organizer ID is required", 400);
     }
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(organizerId)) {
+      return errorResponse("Invalid organizer ID format", 400);
+    }
+
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       return errorResponse("PAY_6002");

@@ -82,8 +82,8 @@ export function useIdleTimeout(options: {
       console.error("Logout error:", error);
     } finally {
       isLoggingOut.current = false;
-      // Redirect to login
-      router.push("/login?reason=idle");
+      // Redirect to home
+      router.push("/home");
       router.refresh();
     }
   }, [onIdle, router]);
@@ -134,7 +134,7 @@ export function useIdleTimeout(options: {
     if (event.key === SESSION_ACTIVE_KEY && event.newValue === null) {
       // Another tab logged out
       clearCachedUser();
-      router.push("/login?reason=logout");
+      router.push("/home");
       router.refresh();
     }
   }, [router]);

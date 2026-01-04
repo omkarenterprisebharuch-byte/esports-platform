@@ -112,7 +112,7 @@ export default function HomePage() {
             <div className="flex items-center gap-3">
               {isLoggedIn ? (
                 <Link
-                  href="/dashboard"
+                  href="/app"
                   className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-medium rounded-lg hover:opacity-90 transition"
                 >
                   My Dashboard
@@ -278,7 +278,7 @@ export default function HomePage() {
                       </Link>
                       {canRegister && (
                         <Link
-                          href={isLoggedIn ? `/register-tournament/${tournament.id}` : `/login?redirect=/register-tournament/${tournament.id}&reason=registration`}
+                          href={isLoggedIn ? `/app/tournament/${tournament.id}` : `/login?redirect=/app/tournament/${tournament.id}&reason=registration`}
                           className="flex-1 px-4 py-2 text-center text-white bg-gradient-to-r from-orange-500 to-pink-500 rounded-lg hover:opacity-90 transition text-sm font-medium"
                         >
                           Register
@@ -374,7 +374,7 @@ export default function HomePage() {
               <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                 {isLoggedIn ? (
                   <>
-                    <li><Link href="/dashboard" className="hover:text-gray-900 dark:hover:text-white">Dashboard</Link></li>
+                    <li><Link href="/app" className="hover:text-gray-900 dark:hover:text-white">Dashboard</Link></li>
                     <li><Link href="/profile" className="hover:text-gray-900 dark:hover:text-white">Profile</Link></li>
                   </>
                 ) : (

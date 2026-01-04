@@ -85,8 +85,8 @@ export async function initSocket(token: string): Promise<Socket> {
   // Lazy load socket.io-client
   const { io } = await getSocketIO();
 
-  // Socket server runs on port 3001 (separate from Next.js)
-  const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
+  // Socket server runs on port 3002 (separate from Next.js)
+  const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || `${window.location.protocol}//${window.location.hostname}:3002`;
 
   console.log("Initializing socket connection to:", socketUrl);
 

@@ -90,7 +90,7 @@ src/app/
 // Redirects authenticated users to dashboard
 // Redirects guests to public landing page
 if (token) {
-  redirect("/dashboard");
+  redirect("/app");
 }
 redirect("/home");
 ```

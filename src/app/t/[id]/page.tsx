@@ -292,7 +292,7 @@ export default async function PublicTournamentPage({ params }: PageProps) {
               <h2 className="text-xl font-bold text-white mb-2">🏆 Tournament Completed</h2>
               <p className="text-gray-400 mb-4">This tournament has ended. Check the leaderboard for results!</p>
               <Link
-                href={`/dashboard/tournament/${tournament.id}/leaderboard`}
+                href={`/app/tournament/${tournament.id}`}
                 className="inline-block px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors"
               >
                 View Results
@@ -305,7 +305,7 @@ export default async function PublicTournamentPage({ params }: PageProps) {
                 {spotsLeft} spot{spotsLeft !== 1 ? "s" : ""} remaining. Sign in to register!
               </p>
               <Link
-                href={`/login?redirect=/dashboard/tournament/${tournament.id}`}
+                href={`/login?redirect=/app/tournament/${tournament.id}`}
                 className="inline-block px-6 py-3 bg-orange-500 text-white rounded-lg font-semibold hover:bg-orange-600 transition-colors"
               >
                 Sign In to Register
@@ -316,7 +316,7 @@ export default async function PublicTournamentPage({ params }: PageProps) {
               <h2 className="text-xl font-bold text-white mb-2">Tournament Full</h2>
               <p className="text-gray-400 mb-4">All spots have been filled. Check back for future tournaments!</p>
               <Link
-                href="/dashboard"
+                href="/app"
                 className="inline-block px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-500 transition-colors"
               >
                 Browse Tournaments
@@ -340,7 +340,7 @@ export default async function PublicTournamentPage({ params }: PageProps) {
 
         {/* Footer Links */}
         <div className="mt-8 flex justify-between items-center text-sm">
-          <Link href="/dashboard" className="text-orange-500 hover:text-orange-400 transition-colors">
+          <Link href="/app" className="text-orange-500 hover:text-orange-400 transition-colors">
             ← Browse All Tournaments
           </Link>
           <Link href="/leaderboard" className="text-orange-500 hover:text-orange-400 transition-colors">

@@ -230,14 +230,14 @@ export default function PublicTournamentDetailPage() {
           {regStatus.canRegister ? (
             isLoggedIn ? (
               <Link
-                href={`/register-tournament/${tournament.id}`}
+                href={`/app/tournament/${tournament.id}`}
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl hover:opacity-90 transition text-center"
               >
                 Register for Tournament
               </Link>
             ) : (
               <Link
-                href={`/login?redirect=/register-tournament/${tournament.id}&reason=registration`}
+                href={`/login?redirect=/app/tournament/${tournament.id}&reason=registration`}
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold rounded-xl hover:opacity-90 transition text-center"
               >
                 Sign in to Register
@@ -376,13 +376,13 @@ export default function PublicTournamentDetailPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href={`/register?redirect=/register-tournament/${tournament.id}`}
+              href={`/register?redirect=/app/tournament/${tournament.id}`}
               className="px-6 py-3 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition"
             >
               Create Account
             </Link>
             <Link
-              href={`/login?redirect=/register-tournament/${tournament.id}&reason=registration`}
+              href={`/login?redirect=/app/tournament/${tournament.id}&reason=registration`}
               className="px-6 py-3 bg-white/20 text-white font-bold rounded-xl hover:bg-white/30 transition"
             >
               Sign In

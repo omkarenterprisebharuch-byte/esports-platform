@@ -101,11 +101,31 @@ export default function TournamentChatRoom({
 
   // Connect and join chat when modal opens
   useEffect(() => {
+    console.log("[Chat] useEffect triggered - isOpen:", isOpen, "hasJoined:", hasJoined);
     if (isOpen && !hasJoined) {
-      const token = localStorage.getItem("token");
-      if (token) {
-        connect(token);
-      }
+      console.log("[Chat] Fetching socket token...");
+      // Fetch socket token from API (uses httpOnly cookie auth)
+      const fetchSocketToken = async () => {
+        try {
+          console.log("[Chat] Making request to /api/auth/socket-token");
+          const response = await fetch("/api/auth/socket-token", {
+            credentials: "include",
+          });
+          console.log("[Chat] Socket token response status:", response.status);
+          if (response.ok) {
+            const data = await response.json();
+            console.log("[Chat] Socket token received:", !!data.token);
+            if (data.token) {
+              connect(data.token);
+            }
+          } else {
+            console.error("[Chat] Failed to get socket token");
+          }
+        } catch (error) {
+          console.error("[Chat] Error fetching socket token:", error);
+        }
+      };
+      fetchSocketToken();
     }
   }, [isOpen, hasJoined, connect]);
 

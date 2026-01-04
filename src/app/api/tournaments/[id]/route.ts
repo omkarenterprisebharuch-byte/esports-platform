@@ -289,7 +289,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     try {
       revalidatePath(`/t/${id}`);
       revalidatePath("/leaderboard");
-      revalidatePath("/dashboard");
+      revalidatePath("/app");
     } catch {
       // Revalidation is best-effort, don't fail the request
     }

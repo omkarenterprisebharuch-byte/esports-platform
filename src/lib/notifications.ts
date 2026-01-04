@@ -128,7 +128,7 @@ export async function sendPushNotification(
       body,
       icon: "/favicon.ico",
       badge: "/favicon.ico",
-      url: data?.url || (data?.tournamentId ? `/tournament/${data.tournamentId}` : "/dashboard"),
+      url: data?.url || (data?.tournamentId ? `/tournament/${data.tournamentId}` : "/app"),
       tournamentId: data?.tournamentId,
       type: data?.type || "general",
       requireInteraction: data?.type === "waitlist_promotion",

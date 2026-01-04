@@ -497,7 +497,7 @@ export async function POST(request: NextRequest) {
 
     // On-demand ISR revalidation for public pages
     try {
-      revalidatePath("/dashboard");
+      revalidatePath("/app");
       revalidatePath("/leaderboard");
       // New tournament page will be generated on first visit
       revalidatePath(`/t/${result.rows[0].id}`);

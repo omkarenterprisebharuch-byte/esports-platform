@@ -2,7 +2,7 @@
   "name": "Esports Platform",
   "short_name": "Esports",
   "description": "Organize, manage, and participate in esports tournaments",
-  "start_url": "/dashboard",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#111827",
@@ -81,7 +81,7 @@
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "View your dashboard",
-      "url": "/dashboard",
+      "url": "/app",
       "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
     },
     {

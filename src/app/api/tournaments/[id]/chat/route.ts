@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { query, queryOne } from "@/lib/db";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { getUserFromHeader } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
 import { ChatMessageDB, dbMessageToSocket } from "@/lib/chat-utils";
 
 interface Tournament {
@@ -32,8 +32,7 @@ export async function GET(
     }
 
     // Verify authentication
-    const authHeader = request.headers.get("authorization");
-    const user = getUserFromHeader(authHeader);
+    const user = getUserFromRequest(request);
     if (!user) {
       return errorResponse("Authentication required", 401);
     }

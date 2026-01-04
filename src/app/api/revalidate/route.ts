@@ -58,22 +58,22 @@ export async function POST(request: NextRequest) {
           revalidatePath(`/t/${id}`);
           revalidated.push(`/t/${id}`);
           
-          // Also revalidate the dashboard version
-          revalidatePath(`/dashboard/tournament/${id}`);
-          revalidated.push(`/dashboard/tournament/${id}`);
+          // Also revalidate the app version
+          revalidatePath(`/app/tournament/${id}`);
+          revalidated.push(`/app/tournament/${id}`);
         } else {
           // Revalidate all tournament-related pages
-          revalidatePath("/dashboard");
+          revalidatePath("/app");
           revalidatePath("/leaderboard");
-          revalidated.push("/dashboard", "/leaderboard");
+          revalidated.push("/app", "/leaderboard");
         }
         break;
 
       case "leaderboard":
         revalidatePath("/leaderboard");
         if (id) {
-          revalidatePath(`/dashboard/tournament/${id}/leaderboard`);
-          revalidated.push(`/dashboard/tournament/${id}/leaderboard`);
+          revalidatePath(`/app/tournament/${id}`);
+          revalidated.push(`/app/tournament/${id}`);
         }
         revalidated.push("/leaderboard");
         break;
@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
         revalidatePath("/leaderboard");
         revalidatePath("/privacy-policy");
         revalidatePath("/terms");
-        revalidatePath("/dashboard");
-        revalidated.push("/leaderboard", "/privacy-policy", "/terms", "/dashboard");
+        revalidatePath("/app");
+        revalidated.push("/leaderboard", "/privacy-policy", "/terms", "/app");
         
         // If ID provided, also revalidate that tournament
         if (id) {

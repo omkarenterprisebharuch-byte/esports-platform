@@ -44,7 +44,6 @@ const adminPaths = ["/admin", "/app/admin"];
 // Paths that need auth - redirect to login with return URL
 const protectedPaths = [
   "/app",
-  "/dashboard",
   "/profile",
   "/my-teams",
   "/my-registrations",

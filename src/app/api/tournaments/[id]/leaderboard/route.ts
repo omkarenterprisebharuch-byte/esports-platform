@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import { PoolClient } from "pg";
 import pool, { withTransaction } from "@/lib/db";
-import { getUserFromHeader } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
 import {
   successResponse,
   errorResponse,
@@ -92,8 +92,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const authHeader = request.headers.get("authorization");
-    const user = getUserFromHeader(authHeader);
+    const user = getUserFromRequest(request);
 
     if (!user) {
       return unauthorizedResponse();

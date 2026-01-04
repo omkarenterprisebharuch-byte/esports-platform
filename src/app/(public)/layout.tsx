@@ -66,7 +66,7 @@ export default function PublicLayout({
               {mounted && (
                 isLoggedIn ? (
                   <Link
-                    href="/dashboard"
+                    href="/app"
                     className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition text-sm"
                   >
                     Go to Dashboard

@@ -8,7 +8,7 @@ const OFFLINE_URL = '/offline.html';
 // Resources to cache immediately on install
 const PRECACHE_RESOURCES = [
   '/',
-  '/dashboard',
+  '/app',
   '/login',
   '/offline.html',
   '/manifest.json',
@@ -293,7 +293,7 @@ self.addEventListener('push', (event) => {
     silent: data.silent || false,
     vibrate: data.vibrate || [200, 100, 200],
     data: {
-      url: data.url || '/dashboard',
+      url: data.url || '/app',
       tournamentId: data.tournamentId,
       type: data.type,
       ...(data.data || {}),
@@ -317,7 +317,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || '/dashboard';
+  const urlToOpen = event.notification.data?.url || '/app';
 
   // Handle action button clicks
   if (event.action === 'dismiss') {

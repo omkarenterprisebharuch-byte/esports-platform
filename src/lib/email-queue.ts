@@ -372,7 +372,7 @@ function createDigestEmail(recipient: string, emails: QueuedEmail[], category: s
               </tr>
               <tr>
                 <td style="padding: 0 40px 30px 40px; text-align: center;">
-                  <a href="${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/dashboard" 
+                  <a href="${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/app" 
                      style="display: inline-block; padding: 14px 28px; background-color: #7c3aed; 
                             color: #ffffff; text-decoration: none; font-weight: 600; 
                             border-radius: 8px; font-size: 16px;">
