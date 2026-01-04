@@ -100,7 +100,7 @@ export default function OwnerDepositsPage() {
         setRequests(data.data.requests);
       }
     } catch (error) {
-      console.error("Failed to fetch requests:", error);
+      console.error("Failed to fetch Your requests:", error);
     } finally {
       setRequestsLoading(false);
     }
