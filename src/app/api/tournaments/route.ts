@@ -46,22 +46,26 @@ export async function GET(request: NextRequest) {
     const templates = searchParams.get("templates");
     const search = searchParams.get("search");
 
-    // Get user for hosted filter
+    // Get user for hosted filter and for hiding completed tournaments
     let userId: string | null = null;
-    if (hosted === "true") {
-      const user = getUserFromRequest(request);
-      if (!user) {
-        return unauthorizedResponse();
+    let isLoggedIn = false;
+    const user = getUserFromRequest(request);
+    if (user) {
+      isLoggedIn = true;
+      if (hosted === "true") {
+        userId = user.id;
       }
-      userId = user.id;
+    } else if (hosted === "true") {
+      return unauthorizedResponse();
     }
 
     // Get tournament type for filtering
     const tournamentType = searchParams.get("tournament_type");
 
     // Build cache key for non-user-specific requests
-    // User-specific requests (hosted=true) are not cached
-    const isCacheable = hosted !== "true" && !userId && !search;
+    // User-specific requests (hosted=true or logged-in users) are not cached
+    // Logged-in users have completed tournaments hidden, so they need different cache
+    const isCacheable = hosted !== "true" && !userId && !search && !isLoggedIn;
     const cacheKey = isCacheable
       ? cacheKeys.tournamentList({
           status: status || undefined,
@@ -158,8 +162,9 @@ export async function GET(request: NextRequest) {
 
     // Filter by computed status
     if (filter === "upcoming") {
-      // Upcoming: registration has ended but tournament hasn't started
-      query += ` AND t.registration_end_date <= NOW() AND t.tournament_start_date > NOW()`;
+      // Upcoming: either registration ended (but tournament not started) OR registration hasn't started yet
+      // This matches the computed_status logic: registration_end_date <= NOW() OR registration_start_date > NOW()
+      query += ` AND t.tournament_start_date > NOW() AND (t.registration_end_date <= NOW() OR t.registration_start_date > NOW())`;
     } else if (filter === "registration_open") {
       // Registration open: registration period is active
       query += ` AND t.registration_start_date <= NOW() AND t.registration_end_date > NOW()`;
@@ -173,6 +178,10 @@ export async function GET(request: NextRequest) {
     } else if (filter === "completed") {
       // Completed: tournament has ended
       query += ` AND t.tournament_end_date <= NOW()`;
+    } else {
+      // For all users (logged-in and guests), hide completed tournaments by default
+      // unless explicitly requested via filter=completed
+      query += ` AND t.tournament_end_date > NOW()`;
     }
 
     if (status) {

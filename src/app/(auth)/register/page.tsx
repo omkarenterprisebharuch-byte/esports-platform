@@ -141,7 +141,7 @@ function RegisterContent() {
       <div className="w-full max-w-md">
         {/* Back to home link */}
         <Link 
-          href="/home" 
+          href="/" 
           className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-6 transition"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

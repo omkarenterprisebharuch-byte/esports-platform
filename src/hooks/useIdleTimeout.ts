@@ -83,7 +83,7 @@ export function useIdleTimeout(options: {
     } finally {
       isLoggingOut.current = false;
       // Redirect to home
-      router.push("/home");
+      router.push("/");
       router.refresh();
     }
   }, [onIdle, router]);
@@ -134,7 +134,7 @@ export function useIdleTimeout(options: {
     if (event.key === SESSION_ACTIVE_KEY && event.newValue === null) {
       // Another tab logged out
       clearCachedUser();
-      router.push("/home");
+      router.push("/");
       router.refresh();
     }
   }, [router]);

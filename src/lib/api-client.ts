@@ -216,7 +216,7 @@ export async function logout(): Promise<void> {
   
   // Redirect to home
   if (typeof window !== "undefined") {
-    window.location.replace("/home");
+    window.location.replace("/");
   }
 }
 

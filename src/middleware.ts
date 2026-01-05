@@ -7,7 +7,6 @@ const publicPaths = [
   "/login",
   "/register",
   "/forgot-password",
-  "/home",
   "/tournaments",
   "/leaderboard",
   "/hall-of-fame",
@@ -76,8 +75,8 @@ export function middleware(request: NextRequest) {
   if (isPublicPath && token && pathname !== "/api/auth/login" && pathname !== "/api/auth/logout") {
     // Don't redirect API routes
     if (!pathname.startsWith("/api/")) {
-      // Don't redirect from public viewing pages (tournaments, leaderboard, home, root, etc.)
-      const viewingOnlyPaths = ["/", "/home", "/tournaments", "/leaderboard", "/hall-of-fame", "/privacy-policy", "/terms"];
+      // Don't redirect from public viewing pages (tournaments, leaderboard, root, etc.)
+      const viewingOnlyPaths = ["/", "/tournaments", "/leaderboard", "/hall-of-fame", "/privacy-policy", "/terms"];
       const isViewingPath = viewingOnlyPaths.some(p => pathname === p || (p !== "/" && pathname.startsWith(p + "/")));
       if (!isViewingPath) {
         return NextResponse.redirect(new URL("/app", request.url));

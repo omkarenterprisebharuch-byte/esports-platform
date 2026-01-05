@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { isAuthenticated } from "@/lib/api-client";
+import WhyChooseUs from "@/components/ui/WhyChooseUs";
 
 interface Tournament {
   id: string;
@@ -293,35 +294,8 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* Features Section */}
-      <section className="bg-gray-100 dark:bg-gray-900 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-12">Why Join Us?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-orange-100 dark:bg-orange-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">🏆</span>
-              </div>
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2">Win Prizes</h3>
-              <p className="text-gray-600 dark:text-gray-400">Compete for real money prizes in tournaments across multiple games.</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">👥</span>
-              </div>
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2">Build Teams</h3>
-              <p className="text-gray-600 dark:text-gray-400">Create or join teams to compete together in squad tournaments.</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <span className="text-3xl">📊</span>
-              </div>
-              <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2">Track Stats</h3>
-              <p className="text-gray-600 dark:text-gray-400">Monitor your progress and climb the global leaderboards.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Features Section - WhyChooseUs Carousel */}
+      <WhyChooseUs />
 
       {/* CTA Section for guests */}
       {!isLoggedIn && (
