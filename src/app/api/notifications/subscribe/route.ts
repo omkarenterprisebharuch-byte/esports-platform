@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
       return validationErrorResponse(validation.error, validation.details);
     }
     
-    const { endpoint, p256dh_key, auth_key, device_type, browser, os } = validation.data;
+    const { endpoint, p256dh_key, auth_key } = validation.data;
 
     // Check if subscription already exists
     const existing = await queryOne<PushSubscription>(
@@ -53,11 +53,9 @@ export async function POST(request: NextRequest) {
       // Update existing subscription
       await query(
         `UPDATE push_subscriptions
-         SET user_id = $1, p256dh_key = $2, auth_key = $3,
-             device_type = $4, browser = $5, os = $6,
-             is_active = TRUE, last_used_at = NOW()
-         WHERE endpoint = $7`,
-        [user.id, p256dh_key, auth_key, device_type, browser, os, endpoint]
+         SET user_id = $1, p256dh_key = $2, auth_key = $3, updated_at = NOW()
+         WHERE endpoint = $4`,
+        [user.id, p256dh_key, auth_key, endpoint]
       );
 
       return successResponse({ message: "Subscription updated" });
@@ -66,9 +64,9 @@ export async function POST(request: NextRequest) {
     // Create new subscription
     await query(
       `INSERT INTO push_subscriptions
-       (user_id, endpoint, p256dh_key, auth_key, device_type, browser, os)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [user.id, endpoint, p256dh_key, auth_key, device_type, browser, os]
+       (user_id, endpoint, p256dh_key, auth_key)
+       VALUES ($1, $2, $3, $4)`,
+      [user.id, endpoint, p256dh_key, auth_key]
     );
 
     return successResponse({ message: "Subscription saved" });
@@ -91,16 +89,13 @@ export async function GET(request: NextRequest) {
     }
 
     const subscriptions = await query<PushSubscription>(
-      `SELECT id, device_type, browser, os, subscribed_at, last_used_at
-       FROM push_subscriptions
-       WHERE user_id = $1 AND is_active = TRUE`,
+      `SELECT id, endpoint FROM push_subscriptions WHERE user_id = $1`,
       [user.id]
     );
 
     return successResponse({
       hasSubscriptions: subscriptions.length > 0,
       subscriptionCount: subscriptions.length,
-      subscriptions,
     });
   } catch (error) {
     console.error("Error checking subscriptions:", error);

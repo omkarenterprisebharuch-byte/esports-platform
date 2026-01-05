@@ -118,13 +118,14 @@ export function middleware(request: NextRequest) {
       (path) => pathname === path || pathname.startsWith(path + "/")
     );
 
-    // Skip CSRF for tournament, registration, and teams operations (they're protected by auth cookies)
+    // Skip CSRF for tournament, registration, teams, and notifications operations (they're protected by auth cookies)
     // This allows backwards compatibility with clients that don't send CSRF tokens
     const isTournamentOperation = pathname === "/api/tournaments" || pathname.startsWith("/api/tournaments/");
     const isRegistrationOperation = pathname.startsWith("/api/registrations/");
     const isTeamsOperation = pathname.startsWith("/api/teams");
+    const isNotificationsOperation = pathname.startsWith("/api/notifications/");
     
-    if (isMutation && !isCsrfExempt && !isTournamentOperation && !isRegistrationOperation && !isTeamsOperation) {
+    if (isMutation && !isCsrfExempt && !isTournamentOperation && !isRegistrationOperation && !isTeamsOperation && !isNotificationsOperation) {
       // Get CSRF token from header (check both cases)
       const csrfToken = request.headers.get("x-csrf-token") || request.headers.get("X-CSRF-Token");
       

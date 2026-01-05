@@ -249,10 +249,10 @@ export function getDeviceInfo(): {
 
 /**
  * Save subscription to server
+ * Uses cookie-based authentication (credentials: include)
  */
 export async function saveSubscriptionToServer(
-  subscription: PushSubscription,
-  token: string
+  subscription: PushSubscription
 ): Promise<boolean> {
   const deviceInfo = getDeviceInfo();
   const subscriptionJson = subscription.toJSON();
@@ -271,15 +271,12 @@ export async function saveSubscriptionToServer(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
+      credentials: 'include', // Use cookie-based authentication
       body: JSON.stringify({
         endpoint: subscriptionJson.endpoint,
         p256dh_key: subscriptionJson.keys.p256dh,
         auth_key: subscriptionJson.keys.auth,
-        device_type: deviceInfo.deviceType,
-        browser: deviceInfo.browser,
-        os: deviceInfo.os,
       }),
     });
 
@@ -299,8 +296,9 @@ export async function saveSubscriptionToServer(
 
 /**
  * Remove subscription from server
+ * Uses cookie-based authentication (credentials: include)
  */
-export async function removeSubscriptionFromServer(token: string): Promise<boolean> {
+export async function removeSubscriptionFromServer(): Promise<boolean> {
   const registration = await getServiceWorkerRegistration();
   if (!registration) return false;
 
@@ -312,8 +310,8 @@ export async function removeSubscriptionFromServer(token: string): Promise<boole
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
+      credentials: 'include', // Use cookie-based authentication
       body: JSON.stringify({
         endpoint: subscription.endpoint,
       }),
@@ -328,8 +326,9 @@ export async function removeSubscriptionFromServer(token: string): Promise<boole
 
 /**
  * Full flow: Request permission, subscribe, and save to server
+ * Uses cookie-based authentication automatically
  */
-export async function enablePushNotifications(token: string): Promise<{
+export async function enablePushNotifications(): Promise<{
   success: boolean;
   error?: string;
   isLocalHostIssue?: boolean;
@@ -367,8 +366,8 @@ export async function enablePushNotifications(token: string): Promise<{
       return { success: false, error: 'Failed to create subscription' };
     }
 
-    // 4. Save to server
-    const saved = await saveSubscriptionToServer(subscription, token);
+    // 4. Save to server (uses cookie auth automatically)
+    const saved = await saveSubscriptionToServer(subscription);
     if (!saved) {
       return { success: false, error: 'Failed to save subscription' };
     }

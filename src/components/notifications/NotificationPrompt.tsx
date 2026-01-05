@@ -4,8 +4,6 @@ import React, { useState, useEffect } from "react";
 import {
   isPushSupported,
   getPermissionStatus,
-  shouldAskPermission,
-  isPermissionDenied,
   enablePushNotifications,
   registerServiceWorker,
   hasActiveSubscription,
@@ -13,55 +11,51 @@ import {
 
 interface NotificationPromptProps {
   onClose?: () => void;
-  showOnDenied?: boolean; // Show even if previously denied (for re-login)
+  showOnDenied?: boolean;
 }
 
-export default function NotificationPrompt({
-  onClose,
-  showOnDenied = false,
-}: NotificationPromptProps) {
+export default function NotificationPrompt({ onClose, showOnDenied = false }: NotificationPromptProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isDenied, setIsDenied] = useState(false);
 
   useEffect(() => {
-    checkShouldShow();
-  }, [showOnDenied]);
+    initializePrompt();
+  }, []);
 
-  const checkShouldShow = async () => {
+  const initializePrompt = async () => {
     // Check if push is supported
     if (!isPushSupported()) {
-      console.log("[Notification] Push not supported");
       return;
     }
 
-    // Register service worker on load
+    // Register service worker
     await registerServiceWorker();
 
     const status = getPermissionStatus();
 
-    // If permission granted, check if we have active subscription
+    // If already granted, check subscription
     if (status === "granted") {
       const hasSubscription = await hasActiveSubscription();
       if (hasSubscription) {
-        // Already subscribed, don't show
         return;
       }
-      // Permission granted but no subscription - show prompt to complete setup
+      // Permission granted but no subscription
       setIsVisible(true);
       return;
     }
 
-    // If denied and showOnDenied is true (re-login), show with different message
-    if (status === "denied" && showOnDenied) {
+    // If denied, show with different message
+    if (status === "denied") {
+      setIsDenied(true);
       setIsVisible(true);
       return;
     }
 
-    // If never asked, show prompt
-    if (shouldAskPermission()) {
-      // Small delay to not show immediately on page load
+    // If never asked, show after delay
+    if (status === "default") {
       setTimeout(() => setIsVisible(true), 2000);
     }
   };
@@ -70,139 +64,130 @@ export default function NotificationPrompt({
     setIsLoading(true);
     setError(null);
 
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("Please log in to enable notifications");
-      setIsLoading(false);
-      return;
-    }
+    try {
+      const result = await enablePushNotifications();
 
-    const result = await enablePushNotifications(token);
-
-    if (result.success) {
-      setSuccess(true);
-      // Hide after showing success
-      setTimeout(() => {
+      if (result.success) {
+        setSuccess(true);
+        setTimeout(() => {
+          setIsVisible(false);
+          onClose?.();
+        }, 2000);
+      } else if (result.isLocalHostIssue) {
+        // Localhost limitation - dismiss gracefully
         setIsVisible(false);
         onClose?.();
-      }, 2000);
-    } else if (result.isLocalHostIssue) {
-      // On localhost, just dismiss gracefully since this is expected
-      console.log('[Notifications] Localhost limitation - dismissing prompt');
-      setIsVisible(false);
-      onClose?.();
-    } else {
-      setError(result.error || "Failed to enable notifications");
+      } else {
+        setError(result.error || "Failed to enable notifications");
+      }
+    } catch (err) {
+      console.error("Failed to enable push notifications:", err);
+      setError("Something went wrong");
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const handleDismiss = () => {
     setIsVisible(false);
-    // Store dismissal in localStorage to avoid showing again this session
     localStorage.setItem("notification_prompt_dismissed", Date.now().toString());
     onClose?.();
   };
 
   if (!isVisible) return null;
 
-  const isDenied = isPermissionDenied();
-
   return (
     <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
-      <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-5 max-w-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 p-5 max-w-sm">
         {success ? (
-          // Success state
           <div className="text-center py-2">
             <div className="text-4xl mb-2">✅</div>
-            <p className="font-semibold text-gray-900">Notifications Enabled!</p>
-            <p className="text-sm text-gray-600">
+            <p className="font-semibold text-gray-900 dark:text-white">
+              Notifications Enabled!
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               You&apos;ll receive important updates
             </p>
           </div>
         ) : isDenied ? (
-          // Denied state - show how to enable
-          <>
+          <div>
             <div className="flex items-start gap-3 mb-4">
-              <span className="text-3xl">🔔</span>
+              <div className="text-2xl">🔕</div>
               <div>
-                <h3 className="font-semibold text-gray-900 text-lg">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
                   Notifications Blocked
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  You&apos;ve blocked notifications. To receive important updates 
-                  like tournament room IDs and passwords:
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  To receive updates, enable notifications in your browser settings:
                 </p>
               </div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm text-gray-700">
-              <p className="font-medium mb-2">How to enable:</p>
-              <ol className="list-decimal list-inside space-y-1 text-gray-600">
-                <li>Click the 🔒 icon in your browser address bar</li>
-                <li>Find &quot;Notifications&quot; setting</li>
-                <li>Change from &quot;Block&quot; to &quot;Allow&quot;</li>
-                <li>Refresh this page</li>
-              </ol>
+            <ol className="text-sm text-gray-600 dark:text-gray-400 space-y-1 ml-9 mb-4 list-decimal">
+              <li>Click the lock icon in the address bar</li>
+              <li>Find &quot;Notifications&quot; setting</li>
+              <li>Change from &quot;Block&quot; to &quot;Allow&quot;</li>
+              <li>Refresh the page</li>
+            </ol>
+            <div className="flex justify-end">
+              <button
+                onClick={handleDismiss}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Got it
+              </button>
             </div>
-            <button
-              onClick={handleDismiss}
-              className="w-full py-2 text-gray-600 hover:text-gray-800 font-medium"
-            >
-              Got it
-            </button>
-          </>
+          </div>
         ) : (
-          // Default prompt state
-          <>
-            <div className="flex items-start gap-3 mb-4">
-              <span className="text-3xl">🔔</span>
+          <div>
+            <div className="flex items-start gap-3 mb-3">
+              <div className="text-2xl">🔔</div>
               <div>
-                <h3 className="font-semibold text-gray-900 text-lg">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
                   Stay Updated!
                 </h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Get instant notifications for:
                 </p>
               </div>
             </div>
 
-            <ul className="space-y-2 mb-4 text-sm text-gray-700">
-              <li className="flex items-center gap-2">
+            <ul className="space-y-2 mb-4 ml-9">
+              <li className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <span className="text-green-500">✓</span>
-                Room ID & Password when published
+                Room ID &amp; Password when published
               </li>
-              <li className="flex items-center gap-2">
+              <li className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <span className="text-green-500">✓</span>
                 Tournament start reminders
               </li>
-              <li className="flex items-center gap-2">
+              <li className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <span className="text-green-500">✓</span>
                 Important announcements
               </li>
             </ul>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">
+              <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
                 {error}
               </div>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={handleDismiss}
-                className="flex-1 py-2.5 px-4 text-gray-600 hover:text-gray-800 font-medium rounded-lg hover:bg-gray-50 transition"
+                disabled={isLoading}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-50"
               >
                 Maybe Later
               </button>
               <button
                 onClick={handleEnable}
                 disabled={isLoading}
-                className="flex-1 py-2.5 px-4 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg disabled:opacity-50 flex items-center gap-2"
               >
                 {isLoading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span className="animate-spin">⏳</span>
                     Enabling...
                   </>
                 ) : (
@@ -210,25 +195,9 @@ export default function NotificationPrompt({
                 )}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes slide-up {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s ease-out;
-        }
-      `}</style>
     </div>
   );
 }
