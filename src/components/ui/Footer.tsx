@@ -85,7 +85,7 @@ export default function Footer() {
         <div className="border-t border-gray-700 mt-8 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm text-center md:text-left">
-              © {currentYear} Esports Platform. All rights reserved.
+              © {currentYear} Esports Platform. All rights reserved | Owned By Vaibhav Lohiya.
             </p>
             <div className="flex space-x-6">
               <Link
