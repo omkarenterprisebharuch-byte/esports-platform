@@ -14,6 +14,7 @@ export {
   SkeletonProfile,
 } from './Skeleton';
 export { default as Footer } from './Footer';
+export { DevelopmentNotice } from './DevelopmentNotice';
 export { LazyRoomCredentials } from './LazyRoomCredentials';
 export { LazyChatButton, LazyChatRoom, LazyChatProvider, LazyNotificationPrompt } from './LazyComponents';
 export { Loader, LoaderProvider, useLoader, PageLoader, NavigationLoader } from './Loader';

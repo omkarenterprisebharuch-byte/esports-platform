@@ -205,7 +205,7 @@ export default function PrivacyPolicyPage() {
                 data, please contact us at:
               </p>
               <p className="text-gray-300 mt-2">
-                Email: privacy@example.com
+                Email: info@novatourney.online
                 <br />
                 Address: [Your Company Address]
               </p>

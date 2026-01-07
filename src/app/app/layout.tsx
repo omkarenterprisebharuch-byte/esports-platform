@@ -9,6 +9,7 @@ import { RegistrationCacheProvider, clearRegistrationCache, useIdleTimeout, clea
 import { api, logout, isAuthenticated, isLogoutInProgress, setLogoutInProgress } from "@/lib/api-client";
 import { AppSidebar } from "@/components/app/AppSidebar";
 import { AppHeader } from "@/components/app/AppHeader";
+import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 
 // Lazy load notification prompt - not critical for initial render
 const NotificationPrompt = dynamic(
@@ -167,72 +168,108 @@ export default function AppLayout({
   }
 
   return (
-    <LoaderProvider>
-      <RegistrationCacheProvider>
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-          {/* Sidebar */}
-          <AppSidebar 
-            user={user} 
-            onLogout={handleLogout}
-            isOpen={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-          />
-
-          {/* Header */}
-          <AppHeader 
+    <SidebarProvider>
+      <LoaderProvider>
+        <RegistrationCacheProvider>
+          <AppLayoutContent 
             user={user}
-            onMenuClick={() => setSidebarOpen(true)}
-          />
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            handleLogout={handleLogout}
+            showIdleWarning={showIdleWarning}
+            dismissIdleWarning={dismissIdleWarning}
+          >
+            {children}
+          </AppLayoutContent>
+        </RegistrationCacheProvider>
+      </LoaderProvider>
+    </SidebarProvider>
+  );
+}
 
-          {/* Main Content */}
-          <main className="lg:ml-72 lg:pt-16 min-h-screen">
-            <div className="p-4 md:p-6 lg:p-8">
-              <ErrorBoundary>
-                <Suspense fallback={
-                  <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin w-8 h-8 border-4 border-gray-900 dark:border-white border-t-transparent dark:border-t-transparent rounded-full" />
-                  </div>
-                }>
-                  {children}
-                </Suspense>
-              </ErrorBoundary>
-            </div>
-          </main>
+// Separate component that uses the sidebar context
+function AppLayoutContent({ 
+  user, 
+  sidebarOpen, 
+  setSidebarOpen, 
+  handleLogout,
+  showIdleWarning,
+  dismissIdleWarning,
+  children 
+}: {
+  user: User;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  handleLogout: () => void;
+  showIdleWarning: boolean;
+  dismissIdleWarning: () => void;
+  children: React.ReactNode;
+}) {
+  const { isCollapsed } = useSidebar();
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+      {/* Sidebar */}
+      <AppSidebar 
+        user={user} 
+        onLogout={handleLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
-          {/* Notification Permission Prompt */}
-          <NotificationPrompt showOnDenied />
-          
-          {/* Idle Warning Modal */}
-          {showIdleWarning && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-              <div 
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200"
-                onClick={dismissIdleWarning}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    Session Expiring Soon
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    You&apos;ve been inactive for a while. Your session will expire in 2 minutes.
-                  </p>
-                  <button
-                    onClick={dismissIdleWarning}
-                    className="w-full py-3 px-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition"
-                  >
-                    I&apos;m Still Here
-                  </button>
-                </div>
+      {/* Header */}
+      <AppHeader 
+        user={user}
+        onMenuClick={() => setSidebarOpen(true)}
+      />
+
+      {/* Main Content */}
+      <main className={`lg:pt-16 min-h-screen transition-all duration-300 ${isCollapsed ? "lg:ml-20" : "lg:ml-72"}`}>
+        <div className="p-4 md:p-6 lg:p-8">
+          <ErrorBoundary>
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-64">
+                <div className="animate-spin w-8 h-8 border-4 border-gray-900 dark:border-white border-t-transparent dark:border-t-transparent rounded-full" />
               </div>
-            </div>
-          )}
+            }>
+              {children}
+            </Suspense>
+          </ErrorBoundary>
         </div>
-      </RegistrationCacheProvider>
-    </LoaderProvider>
+      </main>
+
+      {/* Notification Permission Prompt */}
+      <NotificationPrompt showOnDenied />
+      
+      {/* Idle Warning Modal */}
+      {showIdleWarning && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div 
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-200"
+            onClick={dismissIdleWarning}
+          >
+            <div className="text-center">
+              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                Session Expiring Soon
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                You&apos;ve been inactive for a while. Your session will expire in 2 minutes.
+              </p>
+              <button
+                onClick={dismissIdleWarning}
+                className="w-full py-3 px-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold rounded-xl hover:bg-gray-800 dark:hover:bg-gray-100 transition"
+              >
+                I&apos;m Still Here
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

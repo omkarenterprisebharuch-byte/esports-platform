@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 interface NavItem {
   icon: React.ReactNode | string;
@@ -47,6 +48,7 @@ const publicNavItems: NavItem[] = [
 
 export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps) {
   const pathname = usePathname();
+  const { isCollapsed, toggleCollapse } = useSidebar();
   const isAdminOrHost = user?.is_admin || user?.is_host;
   const isOwner = user?.role === "owner";
 
@@ -61,9 +63,11 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
       <Link
         href={item.href}
         onClick={onClose}
+        title={isCollapsed ? item.label : undefined}
         className={`
           flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
           transition-all duration-200
+          ${isCollapsed ? "justify-center" : ""}
           ${isActive
             ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm"
             : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -71,8 +75,8 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
         `}
       >
         {icon}
-        <span className="flex-1">{item.label}</span>
-        {item.badge !== undefined && (
+        {!isCollapsed && <span className="flex-1">{item.label}</span>}
+        {!isCollapsed && item.badge !== undefined && (
           <span className={`
             px-2 py-0.5 text-xs font-semibold rounded-full
             ${isActive 
@@ -89,9 +93,11 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
 
   const NavSection = ({ title, items }: { title: string; items: NavItem[] }) => (
     <div className="mb-6">
-      <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-        {title}
-      </h3>
+      {!isCollapsed && (
+        <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          {title}
+        </h3>
+      )}
       <nav className="space-y-1">
         {items.map((item) => (
           <NavLink key={item.href} item={item} />
@@ -103,31 +109,35 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="flex items-center gap-2 px-2 mb-8">
+      <div className={`flex items-center gap-2 px-2 mb-8 ${isCollapsed ? "justify-center" : ""}`}>
         <span className="text-2xl">🎮</span>
-        <span className="text-lg font-bold text-gray-900 dark:text-white">
-          Esports Platform
-        </span>
+        {!isCollapsed && (
+          <span className="text-lg font-bold text-gray-900 dark:text-white">
+            Esports Platform
+          </span>
+        )}
       </div>
 
       {/* User Profile Card */}
-      <div className="bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-800/50 rounded-2xl p-4 mb-6">
-        <div className="flex items-center gap-3">
+      <div className={`bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-800/50 rounded-2xl p-4 mb-6 ${isCollapsed ? "p-2" : ""}`}>
+        <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
           <Image
             src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}&background=111827&color=fff`}
             alt={user.username}
-            width={44}
-            height={44}
+            width={isCollapsed ? 36 : 44}
+            height={isCollapsed ? 36 : 44}
             className="rounded-full ring-2 ring-white dark:ring-gray-700"
           />
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 dark:text-white truncate">
-              {user.username}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {isOwner ? "👑 Owner" : isAdminOrHost ? "⚙️ Host" : "🎮 Player"}
-            </p>
-          </div>
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 dark:text-white truncate">
+                {user.username}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {isOwner ? "👑 Owner" : isAdminOrHost ? "⚙️ Host" : "🎮 Player"}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -140,16 +150,20 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
         {/* Admin/Host Section */}
         {isAdminOrHost && (
           <div className="mb-6">
-            <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              Management
-            </h3>
+            {!isCollapsed && (
+              <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Management
+              </h3>
+            )}
             <nav className="space-y-1">
               <Link
                 href="/app/admin"
                 onClick={onClose}
+                title={isCollapsed ? "Admin Panel" : undefined}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                   transition-all duration-200
+                  ${isCollapsed ? "justify-center" : ""}
                   ${pathname?.startsWith("/app/admin")
                     ? "bg-indigo-600 text-white shadow-sm"
                     : "text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
@@ -157,7 +171,7 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
                 `}
               >
                 <span>⚙️</span>
-                <span>Admin Panel</span>
+                {!isCollapsed && <span>Admin Panel</span>}
               </Link>
             </nav>
           </div>
@@ -170,9 +184,11 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
               <Link
                 href="/app/owner"
                 onClick={onClose}
+                title={isCollapsed ? "Owner Portal" : undefined}
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                   transition-all duration-200
+                  ${isCollapsed ? "justify-center" : ""}
                   ${pathname?.startsWith("/app/owner")
                     ? "bg-purple-600 text-white shadow-sm"
                     : "text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50"
@@ -180,7 +196,7 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
                 `}
               >
                 <span>👑</span>
-                <span>Owner Portal</span>
+                {!isCollapsed && <span>Owner Portal</span>}
               </Link>
             </nav>
           </div>
@@ -190,11 +206,13 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
       {/* Logout Button */}
       <button
         onClick={onLogout}
-        className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full
-          text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+        title={isCollapsed ? "Sign Out" : undefined}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium w-full
+          text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors
+          ${isCollapsed ? "justify-center" : ""}`}
       >
         <span>🚪</span>
-        <span>Sign Out</span>
+        {!isCollapsed && <span>Sign Out</span>}
       </button>
     </>
   );
@@ -232,7 +250,22 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
       </div>
 
       {/* Desktop Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 p-4 hidden lg:flex flex-col">
+      <aside className={`fixed left-0 top-0 h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 p-4 hidden lg:flex flex-col transition-all duration-300 ${isCollapsed ? "w-20" : "w-72"}`}>
+        {/* Collapse Toggle Button */}
+        <button
+          onClick={toggleCollapse}
+          className="absolute -right-3 top-20 w-6 h-6 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors shadow-md z-10"
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <svg 
+            className={`w-4 h-4 text-gray-600 dark:text-gray-300 transition-transform duration-300 ${isCollapsed ? "rotate-180" : ""}`} 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
         {sidebarContent}
       </aside>
     </>

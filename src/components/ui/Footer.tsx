@@ -1,12 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const pathname = usePathname();
+  const { isCollapsed } = useSidebar();
+  
+  // Check if we're in the app section (authenticated area with sidebar)
+  const isInAppSection = pathname?.startsWith("/app");
+  
+  // Calculate margin for sidebar - only on large screens and when in app section
+  const sidebarMargin = isInAppSection 
+    ? isCollapsed 
+      ? "lg:ml-20" 
+      : "lg:ml-72"
+    : "";
 
   return (
-    <footer className="bg-gray-800 border-t border-gray-700">
+    <footer className={`bg-gray-800 border-t border-gray-700 transition-all duration-300 ${sidebarMargin}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand Section */}

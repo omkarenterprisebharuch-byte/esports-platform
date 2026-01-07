@@ -7,7 +7,8 @@ import { PWAProvider } from "@/components/pwa";
 // import { Analytics } from "@vercel/analytics/react";
 // import { SpeedInsights } from "@vercel/speed-insights/next";
 import { NavigationLoader } from "@/components/ui/Loader";
-import { Footer } from "@/components/ui";
+import { Footer, DevelopmentNotice } from "@/components/ui";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -69,17 +70,24 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
-        <ThemeProvider>
-          <PWAProvider>
-            <div className="min-h-screen flex flex-col">
-              <NavigationLoader />
-              <main className="flex-1">
-                {children}
-              </main>
-              <Footer />
-            </div>
-          </PWAProvider>
-        </ThemeProvider>
+        <Providers>
+          <ThemeProvider>
+            <PWAProvider>
+              <div className="min-h-screen flex flex-col">
+                <NavigationLoader />
+                <main className="flex-1">
+                  {children}
+                </main>
+                <Footer />
+                <DevelopmentNotice 
+                  position="bottom-right"
+                  autoDismissDelay={5000}
+                  enabled={true}
+                />
+              </div>
+            </PWAProvider>
+          </ThemeProvider>
+        </Providers>
         {/* Analytics disabled for local dev */}
         {/* <Analytics /> */}
         {/* <SpeedInsights /> */}
