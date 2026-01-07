@@ -6,10 +6,10 @@ export const dynamic = "force-static";
 export const revalidate = false; // Never revalidate - fully static
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Esports Platform",
+  title: "Terms of Service | Nova Tourney",
   description: "Read our terms of service for participating in esports tournaments on our platform.",
   openGraph: {
-    title: "Terms of Service | Esports Platform",
+    title: "Terms of Service | Nova Tourney",
     description: "Terms and conditions for using our esports tournament platform.",
     type: "website",
   },
@@ -288,9 +288,9 @@ export default function TermsOfServicePage() {
                 For questions about these Terms of Service, please contact us at:
               </p>
               <p className="text-gray-300 mt-2">
-                Email: support@example.com
+                Email: support@novatourney.online
                 <br />
-                Address: [Your Company Address]
+                Address: Surat, Gujarat
               </p>
             </section>
           </div>

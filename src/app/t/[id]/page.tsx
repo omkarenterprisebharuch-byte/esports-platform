@@ -116,7 +116,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!tournament) {
     return {
-      title: "Tournament Not Found | Esports Platform",
+      title: "Tournament Not Found | Nova Tourney",
     };
   }
 

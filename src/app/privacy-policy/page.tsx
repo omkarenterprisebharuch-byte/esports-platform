@@ -6,10 +6,10 @@ export const dynamic = "force-static";
 export const revalidate = false; // Never revalidate - fully static
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Esports Platform",
+  title: "Privacy Policy | Nova Tourney",
   description: "Learn how we collect, use, and protect your personal data on our esports tournament platform.",
   openGraph: {
-    title: "Privacy Policy | Esports Platform",
+    title: "Privacy Policy | Nova Tourney",
     description: "Learn how we collect, use, and protect your personal data.",
     type: "website",
   },
@@ -143,7 +143,7 @@ export default function PrivacyPolicyPage() {
                 <Link href="/profile" className="text-orange-500 hover:underline">
                   profile settings
                 </Link>{" "}
-                or contact us at privacy@example.com.
+                or contact us at info@novatourney.online.
               </p>
             </section>
 
@@ -207,7 +207,7 @@ export default function PrivacyPolicyPage() {
               <p className="text-gray-300 mt-2">
                 Email: info@novatourney.online
                 <br />
-                Address: [Your Company Address]
+                Address: Surat, Gujarat
               </p>
             </section>
           </div>

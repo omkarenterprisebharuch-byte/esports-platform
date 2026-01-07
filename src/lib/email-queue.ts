@@ -349,7 +349,7 @@ function createDigestEmail(recipient: string, emails: QueuedEmail[], category: s
               <tr>
                 <td style="padding: 40px 40px 30px 40px; text-align: center;">
                   <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                    🎮 Esports Platform
+                    🎮 Nova Tourney
                   </h1>
                 </td>
               </tr>
@@ -383,7 +383,7 @@ function createDigestEmail(recipient: string, emails: QueuedEmail[], category: s
               <tr>
                 <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                   <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                    © ${new Date().getFullYear()} Esports Platform. All rights reserved.
+                    © ${new Date().getFullYear()} Nova Tourney. All rights reserved.
                   </p>
                 </td>
               </tr>
@@ -396,12 +396,12 @@ function createDigestEmail(recipient: string, emails: QueuedEmail[], category: s
   `;
   
   const textItems = emails.map(e => `• ${e.subject}`).join("\n");
-  const text = `Esports Platform - ${emails.length} New Notifications\n\n${textItems}\n\nVisit your dashboard to see more details.`;
+  const text = `Nova Tourney - ${emails.length} New Notifications\n\n${textItems}\n\nVisit your dashboard to see more details.`;
   
   return {
     id: generateEmailId(),
     to: recipient,
-    subject: `📬 ${emails.length} new notifications from Esports Platform`,
+    subject: `📬 ${emails.length} new notifications from Nova Tourney`,
     html,
     text,
     priority: "normal",
@@ -478,7 +478,7 @@ async function processQueue(): Promise<void> {
         const transport = getTransporter();
         
         await transport.sendMail({
-          from: `"Esports Platform" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+          from: `"Nova Tourney" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
           to: email.to,
           subject: email.subject,
           html: email.html,
@@ -643,7 +643,7 @@ export async function flushQueue(): Promise<{ sent: number; failed: number }> {
       
       try {
         await transport.sendMail({
-          from: `"Esports Platform" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+          from: `"Nova Tourney" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
           to: email.to,
           subject: email.subject,
           html: email.html,
@@ -746,7 +746,7 @@ export async function sendImmediateEmail(
   const transport = getTransporter();
   
   await transport.sendMail({
-    from: `"Esports Platform" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    from: `"Nova Tourney" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to,
     subject,
     html,

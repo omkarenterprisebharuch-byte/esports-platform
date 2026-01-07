@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Esports Platform",
+  title: "Nova Tourney",
   description:
     "A comprehensive platform for organizing, managing, and participating in esports tournaments",
   keywords: [
@@ -27,10 +27,11 @@ export const metadata: Metadata = {
     "freefire",
     "pubg",
     "valorant",
+    "nova tourney",
   ],
-  authors: [{ name: "Esports Platform" }],
+  authors: [{ name: "Nova Tourney" }],
   openGraph: {
-    title: "Esports Platform",
+    title: "Nova Tourney",
     description: "Organize and participate in esports tournaments",
     type: "website",
   },

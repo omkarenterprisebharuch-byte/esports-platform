@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Leaderboard | Esports Platform",
+  title: "Leaderboard | Nova Tourney",
   description: "View top players and team rankings. Coming soon!",
 };
 

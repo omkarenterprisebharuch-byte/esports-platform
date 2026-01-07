@@ -18,7 +18,7 @@ const sendNotificationSchema = z.object({
 
 // Configure web-push with VAPID keys
 webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT || "mailto:noreply@esportsplatform.com",
+  process.env.VAPID_SUBJECT || "mailto:noreply@novatourney.online",
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
   process.env.VAPID_PRIVATE_KEY || ""
 );

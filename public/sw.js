@@ -304,7 +304,7 @@ self.addEventListener('push', (event) => {
     ],
   };
 
-  const title = data.title || 'Esports Platform';
+  const title = data.title || 'Nova Tourney';
 
   event.waitUntil(
     self.registration.showNotification(title, options)

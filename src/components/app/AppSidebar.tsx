@@ -113,7 +113,7 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
         <span className="text-2xl">🎮</span>
         {!isCollapsed && (
           <span className="text-lg font-bold text-gray-900 dark:text-white">
-            Esports Platform
+            Nova Tourney
           </span>
         )}
       </div>

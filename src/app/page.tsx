@@ -95,7 +95,7 @@ export default function HomePage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center gap-2 font-bold text-xl text-gray-900 dark:text-white">
               <span className="text-2xl">🎮</span>
-              <span>Esports Platform</span>
+              <span>Nova Tourney</span>
             </Link>
             
             <nav className="hidden md:flex items-center gap-6">

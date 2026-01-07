@@ -6,10 +6,10 @@ export const dynamic = "force-static";
 export const revalidate = false; // Never revalidate - fully static
 
 export const metadata: Metadata = {
-  title: "Contact Us | Esports Platform",
+  title: "Contact Us | Nova Tourney",
   description: "Get in touch with our support team for any queries about tournaments, accounts, or technical issues.",
   openGraph: {
-    title: "Contact Us | Esports Platform",
+    title: "Contact Us | Nova Tourney",
     description: "Contact our support team for assistance with esports tournaments.",
     type: "website",
   },
@@ -49,7 +49,7 @@ export default function ContactPage() {
                     </svg>
                     <h3 className="text-lg font-medium text-white">Email</h3>
                   </div>
-                  <p className="text-gray-300">support@esportsplatform.com</p>
+                  <p className="text-gray-300">support@novatourney.online</p>
                   <p className="text-gray-400 text-sm mt-1">
                     We typically respond within 24 hours
                   </p>

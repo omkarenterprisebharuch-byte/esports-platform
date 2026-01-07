@@ -25,10 +25,13 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-white">Esports Platform</h3>
+            <h3 className="text-lg font-bold text-white">Nova Tourney</h3>
             <p className="text-gray-400 text-sm">
               Your ultimate destination for competitive gaming tournaments.
               Join, compete, and rise to glory!
+            </p>
+            <p className="text-gray-500 text-xs">
+              📍 Surat, Gujarat
             </p>
           </div>
 
@@ -99,7 +102,7 @@ export default function Footer() {
         <div className="border-t border-gray-700 mt-8 pt-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm text-center md:text-left">
-              © {currentYear} Esports Platform. All rights reserved | Owned By Vaibhav Lohiya.
+              © {currentYear} Nova Tourney. All rights reserved.
             </p>
             <div className="flex space-x-6">
               <Link

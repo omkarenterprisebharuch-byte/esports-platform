@@ -50,7 +50,7 @@ const nextConfig: NextConfig = {
 
   // Environment variables that are safe to expose to the browser
   env: {
-    NEXT_PUBLIC_APP_NAME: "Esports Platform",
+    NEXT_PUBLIC_APP_NAME: "Nova Tourney",
   },
 
   // Server configuration for custom server (Socket.io)

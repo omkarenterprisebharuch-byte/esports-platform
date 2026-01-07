@@ -29,9 +29,9 @@ export async function sendOTPEmail(
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: `"Esports Platform" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    from: `"Nova Tourney" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to: email,
-    subject: "Email Verification OTP - Esports Platform",
+    subject: "Email Verification OTP - Nova Tourney",
     html: `
       <!DOCTYPE html>
       <html>
@@ -48,7 +48,7 @@ export async function sendOTPEmail(
                 <tr>
                   <td style="padding: 40px 40px 30px 40px; text-align: center;">
                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                      🎮 Esports Platform
+                      🎮 Nova Tourney
                     </h1>
                   </td>
                 </tr>
@@ -85,7 +85,7 @@ export async function sendOTPEmail(
                 <tr>
                   <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                     <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                      © 2025 Esports Platform. All rights reserved.
+                      © 2026 Nova Tourney. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -96,7 +96,7 @@ export async function sendOTPEmail(
       </body>
       </html>
     `,
-    text: `Esports Platform - Email Verification\n\nHello ${username},\n\nYour OTP for email verification is: ${otp}\n\nThis OTP is valid for 10 minutes.`,
+    text: `Nova Tourney - Email Verification\n\nHello ${username},\n\nYour OTP for email verification is: ${otp}\n\nThis OTP is valid for 10 minutes.`,
   };
 
   await transporter.sendMail(mailOptions);
@@ -113,9 +113,9 @@ export async function sendPasswordResetOTPEmail(
   const transporter = createTransporter();
 
   const mailOptions = {
-    from: `"Esports Platform" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    from: `"Nova Tourney" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to: email,
-    subject: "Password Reset OTP - Esports Platform",
+    subject: "Password Reset OTP - Nova Tourney",
     html: `
       <!DOCTYPE html>
       <html>
@@ -132,7 +132,7 @@ export async function sendPasswordResetOTPEmail(
                 <tr>
                   <td style="padding: 40px 40px 30px 40px; text-align: center;">
                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                      🎮 Esports Platform
+                      🎮 Nova Tourney
                     </h1>
                   </td>
                 </tr>
@@ -169,7 +169,7 @@ export async function sendPasswordResetOTPEmail(
                 <tr>
                   <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                     <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                      © 2025 Esports Platform. All rights reserved.
+                      © 2026 Nova Tourney. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -180,7 +180,7 @@ export async function sendPasswordResetOTPEmail(
       </body>
       </html>
     `,
-    text: `Esports Platform - Password Reset\n\nHello ${username},\n\nYour OTP for password reset is: ${otp}\n\nThis OTP is valid for 10 minutes.`,
+    text: `Nova Tourney - Password Reset\n\nHello ${username},\n\nYour OTP for password reset is: ${otp}\n\nThis OTP is valid for 10 minutes.`,
   };
 
   await transporter.sendMail(mailOptions);
@@ -211,9 +211,9 @@ export async function sendNewDeviceLoginEmail(
   });
 
   const mailOptions = {
-    from: `"Esports Platform" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    from: `"Nova Tourney" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to: email,
-    subject: "🔔 New Device Login Detected - Esports Platform",
+    subject: "🔔 New Device Login Detected - Nova Tourney",
     html: `
       <!DOCTYPE html>
       <html>
@@ -230,7 +230,7 @@ export async function sendNewDeviceLoginEmail(
                 <tr>
                   <td style="padding: 40px 40px 30px 40px; text-align: center;">
                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                      🎮 Esports Platform
+                      🎮 Nova Tourney
                     </h1>
                   </td>
                 </tr>
@@ -289,7 +289,7 @@ export async function sendNewDeviceLoginEmail(
                 <tr>
                   <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                     <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                      © 2025 Esports Platform. All rights reserved.
+                      © 2026 Nova Tourney. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -300,7 +300,7 @@ export async function sendNewDeviceLoginEmail(
       </body>
       </html>
     `,
-    text: `Esports Platform - New Device Login Alert\n\nHello ${username},\n\nWe detected a login to your account from a new device.\n\nDevice: ${deviceInfo.deviceName}\nBrowser: ${deviceInfo.browser}\nOperating System: ${deviceInfo.os}\nIP Address: ${deviceInfo.ipAddress}\nTime: ${formattedTime}\n\nIf this was you, you can safely ignore this email.\n\nIf you didn't log in from this device, please change your password immediately and review your active sessions.`,
+    text: `Nova Tourney - New Device Login Alert\n\nHello ${username},\n\nWe detected a login to your account from a new device.\n\nDevice: ${deviceInfo.deviceName}\nBrowser: ${deviceInfo.browser}\nOperating System: ${deviceInfo.os}\nIP Address: ${deviceInfo.ipAddress}\nTime: ${formattedTime}\n\nIf this was you, you can safely ignore this email.\n\nIf you didn't log in from this device, please change your password immediately and review your active sessions.`,
   };
 
   // Queue as high priority transactional email (security-related)
@@ -338,9 +338,9 @@ export async function sendSuspiciousLoginEmail(
   ).join('');
 
   const mailOptions = {
-    from: `"Esports Platform Security" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    from: `"Nova Tourney Security" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
     to: email,
-    subject: "⚠️ Suspicious Login Activity Detected - Esports Platform",
+    subject: "⚠️ Suspicious Login Activity Detected - Nova Tourney",
     html: `
       <!DOCTYPE html>
       <html>
@@ -357,7 +357,7 @@ export async function sendSuspiciousLoginEmail(
                 <tr>
                   <td style="padding: 40px 40px 30px 40px; text-align: center;">
                     <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                      🎮 Esports Platform
+                      🎮 Nova Tourney
                     </h1>
                   </td>
                 </tr>
@@ -423,7 +423,7 @@ export async function sendSuspiciousLoginEmail(
                 <tr>
                   <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                     <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                      © 2025 Esports Platform. All rights reserved.
+                      © 2026 Nova Tourney. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -434,7 +434,7 @@ export async function sendSuspiciousLoginEmail(
       </body>
       </html>
     `,
-    text: `Esports Platform - Suspicious Login Activity Detected\n\nHello ${username},\n\nWe detected unusual activity on your account that may indicate unauthorized access.\n\nRisk Level: ${riskLevel}\nIP Address: ${loginInfo.ipAddress}\nTime: ${formattedTime}\n\nWhy this was flagged:\n${loginInfo.reasons.map(r => `- ${r}`).join('\n')}\n\nIf this wasn't you, please:\n1. Change your password immediately\n2. Review and logout all active sessions\n3. Enable two-factor authentication if available`,
+    text: `Nova Tourney - Suspicious Login Activity Detected\n\nHello ${username},\n\nWe detected unusual activity on your account that may indicate unauthorized access.\n\nRisk Level: ${riskLevel}\nIP Address: ${loginInfo.ipAddress}\nTime: ${formattedTime}\n\nWhy this was flagged:\n${loginInfo.reasons.map(r => `- ${r}`).join('\n')}\n\nIf this wasn't you, please:\n1. Change your password immediately\n2. Review and logout all active sessions\n3. Enable two-factor authentication if available`,
   };
 
   // Queue as high priority transactional email (security alert)

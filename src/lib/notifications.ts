@@ -60,7 +60,7 @@ const DEFAULT_PREFERENCES = {
 // Configure web-push with VAPID keys
 const configureWebPush = () => {
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:noreply@esportsplatform.com",
+    process.env.VAPID_SUBJECT || "mailto:noreply@novatourney.online",
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "",
     process.env.VAPID_PRIVATE_KEY || ""
   );
@@ -254,7 +254,7 @@ export function generateTournamentEmail(
               <tr>
                 <td style="padding: 40px 40px 30px 40px; text-align: center;">
                   <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                    🎮 Esports Platform
+                    🎮 Nova Tourney
                   </h1>
                 </td>
               </tr>
@@ -288,7 +288,7 @@ export function generateTournamentEmail(
               <tr>
                 <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                   <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                    © 2025 Esports Platform. All rights reserved.
+                    © 2025 Nova Tourney. All rights reserved.
                   </p>
                 </td>
               </tr>
@@ -689,7 +689,7 @@ function generateGeneralEmail(
               <tr>
                 <td style="padding: 40px 40px 30px 40px; text-align: center;">
                   <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
-                    🎮 Esports Platform
+                    🎮 Nova Tourney
                   </h1>
                 </td>
               </tr>
@@ -714,7 +714,7 @@ function generateGeneralEmail(
               <tr>
                 <td style="padding: 20px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; text-align: center;">
                   <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-                    © 2025 Esports Platform. All rights reserved.
+                    © 2025 Nova Tourney. All rights reserved.
                   </p>
                 </td>
               </tr>

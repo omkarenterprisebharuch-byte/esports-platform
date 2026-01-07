@@ -33,7 +33,7 @@ export default function PublicLayout({
             <Link href="/" className="flex items-center gap-2">
               <span className="text-2xl">🎮</span>
               <span className="text-xl font-bold text-gray-900 dark:text-white">
-                Esports Platform
+                Nova Tourney
               </span>
             </Link>
 

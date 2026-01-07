@@ -6,10 +6,10 @@ export const dynamic = "force-static";
 export const revalidate = false; // Never revalidate - fully static
 
 export const metadata: Metadata = {
-  title: "Refund and Cancellation Policy | Esports Platform",
+  title: "Refund and Cancellation Policy | Nova Tourney",
   description: "Understand our refund and cancellation policies for tournament registrations and wallet transactions.",
   openGraph: {
-    title: "Refund and Cancellation Policy | Esports Platform",
+    title: "Refund and Cancellation Policy | Nova Tourney",
     description: "Refund and cancellation policies for esports tournaments.",
     type: "website",
   },
@@ -36,7 +36,7 @@ export default function RefundPolicyPage() {
                 This Refund and Cancellation Policy outlines the terms and
                 conditions under which refunds may be issued for tournament
                 registrations, wallet transactions, and other services on our
-                Esports Platform.
+                Nova Tourney.
               </p>
             </section>
 
@@ -125,7 +125,7 @@ export default function RefundPolicyPage() {
                 </h3>
                 <ol className="list-decimal list-inside text-gray-300 space-y-2">
                   <li>
-                    Contact our support team at support@esportsplatform.com
+                    Contact our support team at support@novatourney.online
                   </li>
                   <li>
                     Provide your username, registered email, and transaction
@@ -258,7 +258,7 @@ export default function RefundPolicyPage() {
               </h2>
               <div className="bg-gray-700/50 rounded-lg p-4">
                 <p className="text-gray-300">
-                  <strong>Email:</strong> support@esportsplatform.com
+                  <strong>Email:</strong> support@novatourney.online
                 </p>
                 <p className="text-gray-300 mt-2">
                   <strong>Subject Line:</strong> Refund Request - [Your Username]

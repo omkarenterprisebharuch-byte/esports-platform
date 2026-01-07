@@ -145,7 +145,7 @@ export default function InstallPrompt({ className = "" }: InstallPromptProps) {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                Install Esports Platform
+                Install Nova Tourney
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 Add to your home screen for the best experience
@@ -251,7 +251,7 @@ export default function InstallPrompt({ className = "" }: InstallPromptProps) {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-            Install Esports Platform
+            Install Nova Tourney
           </h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Install our app for faster access and offline support

@@ -1,6 +1,6 @@
 {
-  "name": "Esports Platform",
-  "short_name": "Esports",
+  "name": "Nova Tourney",
+  "short_name": "Nova Tourney",
   "description": "Organize, manage, and participate in esports tournaments",
   "start_url": "/app",
   "display": "standalone",
