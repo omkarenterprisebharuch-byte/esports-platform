@@ -1,6 +1,6 @@
 "use client";
 
-import { getGameDefaults } from "@/lib/game-defaults";
+import { getGameConfig } from "@/lib/game-config";
 
 export interface RulesData {
   description: string;
@@ -8,21 +8,25 @@ export interface RulesData {
 }
 
 interface RulesStepProps {
-  gameType: string;
+  gameId: string;
   data: RulesData;
   onChange: (data: Partial<RulesData>) => void;
   errors?: Record<string, string>;
 }
 
-export default function RulesStep({ gameType, data, onChange, errors = {} }: RulesStepProps) {
-  const gameDefaults = getGameDefaults(gameType);
+export default function RulesStep({ gameId, data, onChange, errors = {} }: RulesStepProps) {
+  const gameConfig = getGameConfig(gameId);
+
+  if (!gameConfig) {
+    return <div className="text-center py-8 text-gray-500">Select a game first</div>;
+  }
 
   const handleApplyDefaultRules = () => {
-    onChange({ match_rules: gameDefaults.default_rules });
+    onChange({ match_rules: gameConfig.defaultRules });
   };
 
   const handleApplyDefaultDescription = () => {
-    onChange({ description: gameDefaults.default_description });
+    onChange({ description: gameConfig.defaultDescription });
   };
 
   return (
@@ -83,7 +87,7 @@ export default function RulesStep({ gameType, data, onChange, errors = {} }: Rul
             className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 
                       dark:hover:text-indigo-300 font-medium"
           >
-            Use {gameDefaults.display_name} Template
+            Use {gameConfig.name} Template
           </button>
         </div>
         <textarea

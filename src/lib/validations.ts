@@ -252,6 +252,220 @@ export const chatMessageSchema = z.object({
   tournamentId: uuidSchema,
 });
 
+// ============ Tournament V2 Schemas (with Game/Mode/TeamSize constraints) ============
+
+/**
+ * Valid game-mode-teamSize combinations
+ * This enforces the business rules for each game
+ */
+export const VALID_GAME_CONFIGS = {
+  freefire: {
+    br_ranked: [1, 2, 4], // Solo, Duo, Squad
+    clash_squad: [1, 2, 3, 4], // 1v1, 2v2, 3v3, 4v4
+  },
+  bgmi: {
+    br: [1, 2, 3, 4], // Always 2 teams
+    tdm: [1, 2, 3, 4], // Always 2 teams
+  },
+  valorant: {
+    competitive: [5], // 5v5 only
+  },
+  codm: {
+    br: [1, 2, 4], // Placeholder
+    multiplayer: [5], // Placeholder
+  },
+} as const;
+
+/**
+ * Max teams allowed per game/mode/teamSize
+ */
+export const MAX_TEAMS_CONFIG = {
+  freefire: {
+    br_ranked: { 1: 48, 2: 24, 4: 12 }, // Based on lobby size
+    clash_squad: { 1: 2, 2: 2, 3: 2, 4: 2 }, // Always 2 teams
+  },
+  bgmi: {
+    br: { 1: 2, 2: 2, 3: 2, 4: 2 }, // Always 2 teams
+    tdm: { 1: 2, 2: 2, 3: 2, 4: 2 }, // Always 2 teams
+  },
+  valorant: {
+    competitive: { 5: 16 },
+  },
+  codm: {
+    br: { 1: 100, 2: 50, 4: 25 },
+    multiplayer: { 5: 2 },
+  },
+} as const;
+
+// Custom field schema for registration
+const customFieldSchema = z.object({
+  name: z.string().min(1).max(50),
+  type: z.enum(["text", "number", "select"]),
+  required: z.boolean(),
+  options: z.array(z.string()).optional(),
+});
+
+// Registration fields schema
+const registrationFieldsSchema = z.object({
+  requireTeamName: z.boolean().default(true),
+  requirePlayerNames: z.boolean().default(true),
+  requireGameIds: z.boolean().default(true),
+  customFields: z.array(customFieldSchema).optional(),
+});
+
+// Base tournament V2 schema
+export const createTournamentV2Schema = z.object({
+  // Core required fields
+  name: z
+    .string()
+    .min(3, "Tournament name must be at least 3 characters")
+    .max(100, "Tournament name must be less than 100 characters")
+    .trim(),
+  game: z.enum(["freefire", "bgmi", "valorant", "codm"], {
+    errorMap: () => ({ message: "Invalid game selected" }),
+  }),
+  mode: z.string().min(1, "Mode is required"),
+  teamSize: z
+    .number()
+    .int()
+    .min(1, "Team size must be at least 1")
+    .max(5, "Team size cannot exceed 5"),
+  maxTeams: z
+    .number()
+    .int()
+    .min(2, "Must have at least 2 teams")
+    .max(100, "Cannot exceed 100 teams"),
+
+  // Registration fields
+  registrationFields: registrationFieldsSchema.optional().default({
+    requireTeamName: true,
+    requirePlayerNames: true,
+    requireGameIds: true,
+  }),
+
+  // Schedule
+  registrationStartDate: z.string().datetime("Invalid registration start date"),
+  registrationEndDate: z.string().datetime("Invalid registration end date"),
+  tournamentStartDate: z.string().datetime("Invalid tournament start date"),
+  tournamentEndDate: z.string().datetime("Invalid tournament end date").optional(),
+
+  // Location
+  isOnline: z.boolean().default(true),
+  venue: z.string().max(200).optional(),
+  venueAddress: z.string().max(500).optional(),
+
+  // Optional fields
+  description: z.string().max(2000).optional(),
+  rules: z.string().max(5000).optional(),
+  mapName: z.string().max(100).optional(),
+  entryFee: z.number().min(0).optional().default(0),
+  prizePool: z.number().min(0).optional().default(0),
+
+  // Auto-scheduling
+  scheduleType: z.enum(["once", "everyday"]).optional().default("once"),
+  publishTime: z.string().optional(),
+});
+
+// Full tournament V2 schema with refinements for game/mode/teamSize validation
+export const createTournamentV2SchemaWithValidation = createTournamentV2Schema
+  .refine(
+    (data) => {
+      // Validate mode exists for the selected game
+      const gameModes = VALID_GAME_CONFIGS[data.game as keyof typeof VALID_GAME_CONFIGS];
+      return gameModes && data.mode in gameModes;
+    },
+    {
+      message: "Invalid mode for selected game",
+      path: ["mode"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validate team size is valid for the game/mode
+      const gameModes = VALID_GAME_CONFIGS[data.game as keyof typeof VALID_GAME_CONFIGS];
+      if (!gameModes) return false;
+      const validSizes = gameModes[data.mode as keyof typeof gameModes] as readonly number[] | undefined;
+      return validSizes?.includes(data.teamSize);
+    },
+    {
+      message: "Invalid team size for selected game and mode",
+      path: ["teamSize"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validate max teams doesn't exceed limit for game/mode/teamSize
+      const gameConfig = MAX_TEAMS_CONFIG[data.game as keyof typeof MAX_TEAMS_CONFIG];
+      if (!gameConfig) return false;
+      const modeConfig = gameConfig[data.mode as keyof typeof gameConfig] as Record<number, number> | undefined;
+      if (!modeConfig) return false;
+      const maxAllowed = modeConfig[data.teamSize];
+      return maxAllowed !== undefined && data.maxTeams <= maxAllowed;
+    },
+    {
+      message: "Max teams exceeds allowed limit for this configuration",
+      path: ["maxTeams"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validate dates are in correct order
+      const regStart = new Date(data.registrationStartDate);
+      const regEnd = new Date(data.registrationEndDate);
+      return regEnd > regStart;
+    },
+    {
+      message: "Registration end date must be after registration start date",
+      path: ["registrationEndDate"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Tournament must start after registration ends
+      const regEnd = new Date(data.registrationEndDate);
+      const tournamentStart = new Date(data.tournamentStartDate);
+      return tournamentStart >= regEnd;
+    },
+    {
+      message: "Tournament must start after registration ends",
+      path: ["tournamentStartDate"],
+    }
+  )
+  .refine(
+    (data) => {
+      // If offline, venue is required
+      if (!data.isOnline && !data.venue) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Venue is required for offline tournaments",
+      path: ["venue"],
+    }
+  );
+
+/**
+ * Utility function to get max teams for a configuration
+ */
+export function getMaxTeamsAllowed(game: string, mode: string, teamSize: number): number | null {
+  const gameConfig = MAX_TEAMS_CONFIG[game as keyof typeof MAX_TEAMS_CONFIG];
+  if (!gameConfig) return null;
+  const modeConfig = gameConfig[mode as keyof typeof gameConfig] as Record<number, number> | undefined;
+  if (!modeConfig) return null;
+  return modeConfig[teamSize] ?? null;
+}
+
+/**
+ * Utility function to get valid team sizes for a game/mode
+ */
+export function getValidTeamSizes(game: string, mode: string): number[] {
+  const gameModes = VALID_GAME_CONFIGS[game as keyof typeof VALID_GAME_CONFIGS];
+  if (!gameModes) return [];
+  const validSizes = gameModes[mode as keyof typeof gameModes] as readonly number[] | undefined;
+  return validSizes ? [...validSizes] : [];
+}
+
 // ============ Validation Helper ============
 
 export type ValidationResult<T> =
@@ -325,3 +539,4 @@ export type RegisterTournamentInput = z.infer<typeof registerTournamentSchema>;
 export type PushSubscriptionInput = z.infer<typeof pushSubscriptionSchema>;
 export type SendNotificationInput = z.infer<typeof sendNotificationSchema>;
 export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
+export type CreateTournamentV2Input = z.infer<typeof createTournamentV2Schema>;

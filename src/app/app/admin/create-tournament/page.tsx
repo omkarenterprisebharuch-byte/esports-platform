@@ -15,7 +15,8 @@ import {
   ScheduleData,
   RulesData,
 } from "@/components/tournament-wizard";
-import { getGameDefaults, generateSmartDates } from "@/lib/game-defaults";
+import { getGameConfig, getGameMode, getMaxTeams, generateSmartDates } from "@/lib/game-config";
+import { validateTournamentConfig } from "@/lib/game-config";
 
 const WIZARD_STEPS = [
   { id: 1, name: "Game", icon: "🎮" },
@@ -26,7 +27,8 @@ const WIZARD_STEPS = [
 ];
 
 interface WizardFormData {
-  game_type: string;
+  game_id: string;
+  mode_id: string;
   basicInfo: BasicInfoData;
   schedule: ScheduleData;
   rules: RulesData;
@@ -37,9 +39,9 @@ interface WizardFormData {
  * 
  * Features:
  * - 5-step wizard (Game → Details → Schedule → Rules → Preview)
- * - Game-specific defaults
+ * - Game-specific defaults with mode selection
  * - Smart date suggestions
- * - Validation at each step
+ * - Validation at each step with game/mode/teamSize constraints
  * - Auto-scheduling support
  */
 export default function CreateTournamentWizard() {
@@ -51,14 +53,16 @@ export default function CreateTournamentWizard() {
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
 
   const [formData, setFormData] = useState<WizardFormData>({
-    game_type: "freefire",
+    game_id: "freefire",
+    mode_id: "br_ranked",
     basicInfo: {
       tournament_name: "",
-      tournament_type: "solo",
-      max_teams: 48,
+      team_size: 4,
+      max_teams: 12,
       entry_fee: 0,
       prize_pool: 500,
       map_name: "Bermuda",
+      is_online: true,
     },
     schedule: {
       registration_start_date: "",
@@ -96,20 +100,26 @@ export default function CreateTournamentWizard() {
   }, [router]);
 
   // Apply game defaults when game changes
-  const handleGameChange = (game: string) => {
-    const defaults = getGameDefaults(game);
-    const smartDates = generateSmartDates(game);
-    const firstType = defaults.tournament_types[0];
+  const handleGameChange = (gameId: string) => {
+    const gameConfig = getGameConfig(gameId);
+    if (!gameConfig) return;
+    
+    const firstMode = gameConfig.modes.find(m => !m.isPlaceholder) || gameConfig.modes[0];
+    const smartDates = generateSmartDates(gameId);
+    const defaultTeamSize = firstMode.teamSizes[firstMode.teamSizes.length - 1]?.value || 4;
+    const maxTeams = getMaxTeams(gameId, firstMode.id, defaultTeamSize);
 
     setFormData({
-      game_type: game,
+      game_id: gameId,
+      mode_id: firstMode.id,
       basicInfo: {
         tournament_name: "",
-        tournament_type: firstType.type,
-        max_teams: firstType.max_teams,
+        team_size: defaultTeamSize,
+        max_teams: maxTeams,
         entry_fee: 0,
-        prize_pool: defaults.prize_pool_suggestions[2] || 500,
-        map_name: defaults.default_map,
+        prize_pool: gameConfig.prizeSuggestions[2] || 500,
+        map_name: gameConfig.defaultMap,
+        is_online: true,
       },
       schedule: {
         ...smartDates,
@@ -117,10 +127,29 @@ export default function CreateTournamentWizard() {
         publish_time: "",
       },
       rules: {
-        description: defaults.default_description,
-        match_rules: defaults.default_rules,
+        description: gameConfig.defaultDescription,
+        match_rules: gameConfig.defaultRules,
       },
     });
+  };
+
+  // Handle mode change
+  const handleModeChange = (modeId: string) => {
+    const modeConfig = getGameMode(formData.game_id, modeId);
+    if (!modeConfig) return;
+
+    const defaultTeamSize = modeConfig.teamSizes[modeConfig.teamSizes.length - 1]?.value || 4;
+    const maxTeams = getMaxTeams(formData.game_id, modeId, defaultTeamSize);
+
+    setFormData((prev) => ({
+      ...prev,
+      mode_id: modeId,
+      basicInfo: {
+        ...prev.basicInfo,
+        team_size: defaultTeamSize,
+        max_teams: maxTeams,
+      },
+    }));
   };
 
   const updateBasicInfo = (data: Partial<BasicInfoData>) => {
@@ -154,14 +183,37 @@ export default function CreateTournamentWizard() {
     const newErrors: Record<string, string> = {};
 
     switch (currentStep) {
+      case 1: // Game Selection
+        const modeConfig = getGameMode(formData.game_id, formData.mode_id);
+        if (!modeConfig) {
+          newErrors.mode = "Please select a valid mode";
+        } else if (modeConfig.isPlaceholder) {
+          newErrors.mode = "This mode is not yet available";
+        }
+        break;
+
       case 2: // Basic Info
         if (!formData.basicInfo.tournament_name.trim()) {
           newErrors.tournament_name = "Tournament name is required";
         } else if (formData.basicInfo.tournament_name.length < 3) {
           newErrors.tournament_name = "Tournament name must be at least 3 characters";
         }
-        if (formData.basicInfo.max_teams < 2) {
-          newErrors.max_teams = "Must have at least 2 participants";
+        
+        // Validate game/mode/teamSize combination
+        const validation = validateTournamentConfig(
+          formData.game_id,
+          formData.mode_id,
+          formData.basicInfo.team_size,
+          formData.basicInfo.max_teams
+        );
+        if (!validation.valid) {
+          validation.errors.forEach((err, idx) => {
+            newErrors[`config_${idx}`] = err;
+          });
+        }
+
+        if (!formData.basicInfo.is_online && !formData.basicInfo.venue?.trim()) {
+          newErrors.venue = "Venue is required for offline tournaments";
         }
         break;
 
@@ -197,6 +249,7 @@ export default function CreateTournamentWizard() {
         break;
 
       case 4: // Rules & Description
+      case 4: // Rules & Description
         if (!formData.rules.description.trim()) {
           newErrors.description = "Description is required";
         } else if (formData.rules.description.length < 20) {
@@ -229,14 +282,18 @@ export default function CreateTournamentWizard() {
     setIsSubmitting(true);
     setMessage(null);
 
+    // Build payload with new structure
     const payload = {
       tournament_name: formData.basicInfo.tournament_name,
-      game_type: formData.game_type,
-      tournament_type: formData.basicInfo.tournament_type,
+      game_type: formData.game_id,
+      game_mode: formData.mode_id,
+      team_size: formData.basicInfo.team_size,
       max_teams: formData.basicInfo.max_teams,
       entry_fee: formData.basicInfo.entry_fee,
       prize_pool: formData.basicInfo.prize_pool,
       map_name: formData.basicInfo.map_name,
+      is_online: formData.basicInfo.is_online,
+      venue: formData.basicInfo.venue,
       description: formData.rules.description,
       match_rules: formData.rules.match_rules,
       registration_start_date: formData.schedule.registration_start_date,
@@ -310,18 +367,33 @@ export default function CreateTournamentWizard() {
         </div>
       )}
 
+      {/* Validation Errors */}
+      {Object.keys(errors).filter(k => k.startsWith("config_")).length > 0 && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <h4 className="font-medium text-red-700 dark:text-red-400 mb-2">Configuration Errors:</h4>
+          <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+            {Object.entries(errors)
+              .filter(([k]) => k.startsWith("config_"))
+              .map(([k, v]) => <li key={k}>{v}</li>)}
+          </ul>
+        </div>
+      )}
+
       {/* Step Content */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
         {currentStep === 1 && (
           <GameSelectionStep
-            selectedGame={formData.game_type}
+            selectedGame={formData.game_id}
+            selectedMode={formData.mode_id}
             onSelectGame={handleGameChange}
+            onSelectMode={handleModeChange}
           />
         )}
 
         {currentStep === 2 && (
           <BasicInfoStep
-            gameType={formData.game_type}
+            gameId={formData.game_id}
+            modeId={formData.mode_id}
             data={formData.basicInfo}
             onChange={updateBasicInfo}
             errors={errors}
@@ -330,7 +402,7 @@ export default function CreateTournamentWizard() {
 
         {currentStep === 3 && (
           <ScheduleStep
-            gameType={formData.game_type}
+            gameId={formData.game_id}
             data={formData.schedule}
             onChange={updateSchedule}
             errors={errors}
@@ -339,7 +411,7 @@ export default function CreateTournamentWizard() {
 
         {currentStep === 4 && (
           <RulesStep
-            gameType={formData.game_type}
+            gameId={formData.game_id}
             data={formData.rules}
             onChange={updateRules}
             errors={errors}
@@ -348,7 +420,8 @@ export default function CreateTournamentWizard() {
 
         {currentStep === 5 && (
           <PreviewStep
-            gameType={formData.game_type}
+            gameId={formData.game_id}
+            modeId={formData.mode_id}
             basicInfo={formData.basicInfo}
             schedule={formData.schedule}
             rules={formData.rules}

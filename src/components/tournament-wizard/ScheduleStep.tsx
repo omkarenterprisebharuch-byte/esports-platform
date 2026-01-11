@@ -1,6 +1,6 @@
 "use client";
 
-import { generateSmartDates, getGameDefaults } from "@/lib/game-defaults";
+import { generateSmartDates, getGameConfig } from "@/lib/game-config";
 
 export interface ScheduleData {
   registration_start_date: string;
@@ -12,19 +12,23 @@ export interface ScheduleData {
 }
 
 interface ScheduleStepProps {
-  gameType: string;
+  gameId: string;
   data: ScheduleData;
   onChange: (data: Partial<ScheduleData>) => void;
   errors: Record<string, string>;
 }
 
-export default function ScheduleStep({ gameType, data, onChange, errors }: ScheduleStepProps) {
-  const gameDefaults = getGameDefaults(gameType);
+export default function ScheduleStep({ gameId, data, onChange, errors }: ScheduleStepProps) {
+  const gameConfig = getGameConfig(gameId);
 
   const handleApplySmartDates = () => {
-    const smartDates = generateSmartDates(gameType);
+    const smartDates = generateSmartDates(gameId);
     onChange(smartDates);
   };
+
+  if (!gameConfig) {
+    return <div className="text-center py-8 text-gray-500">Select a game first</div>;
+  }
 
   const formatDateDisplay = (dateString: string) => {
     if (!dateString) return "";
@@ -52,8 +56,8 @@ export default function ScheduleStep({ gameType, data, onChange, errors }: Sched
           <div>
             <h3 className="font-semibold">⚡ Quick Setup</h3>
             <p className="text-sm text-indigo-100">
-              Auto-fill with recommended timing ({gameDefaults.registration_window_hours}hr registration, 
-              {gameDefaults.recommended_duration_hours}hr tournament)
+              Auto-fill with recommended timing ({gameConfig.registrationWindowHours}hr registration, 
+              {gameConfig.recommendedDurationHours}hr tournament)
             </p>
           </div>
           <button

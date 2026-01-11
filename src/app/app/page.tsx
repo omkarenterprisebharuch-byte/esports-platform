@@ -320,44 +320,6 @@ export default function AppHomePage() {
           </div>
         )}
       </section>
-
-      {/* My Registered Tournaments (if any) */}
-      {registeredIds.size > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              Your Upcoming Matches
-            </h2>
-            <Link
-              href="/app/registrations"
-              className="text-sm font-medium text-orange-600 dark:text-orange-400 hover:underline"
-            >
-              View All →
-            </Link>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <span className="text-2xl">✓</span>
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  You&apos;re registered for {registeredIds.size} tournament{registeredIds.size !== 1 ? "s" : ""}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Check your registrations for room credentials and match details
-                </p>
-              </div>
-              <Link
-                href="/app/registrations"
-                className="ml-auto px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition text-sm"
-              >
-                View Details
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
     </div>
   );
 }
