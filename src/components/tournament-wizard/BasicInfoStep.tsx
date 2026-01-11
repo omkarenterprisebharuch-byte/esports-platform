@@ -4,7 +4,6 @@ import {
   getGameConfig, 
   getGameMode, 
   getMaxTeams, 
-  shouldHideLocation, 
   isMapRequired,
   getSupportedFormats,
   BRACKET_FORMATS,
@@ -47,7 +46,6 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
   const teamSizes = modeConfig.teamSizes;
   const isTeamsLocked = modeConfig.maxTeams === 2;
   const currentMaxTeams = getMaxTeams(gameId, modeId, data.team_size);
-  const hideLocation = shouldHideLocation(gameId, modeId);
   const mapRequired = isMapRequired(gameId, modeId);
   const supportedFormats = getSupportedFormats(gameId, modeId);
 
@@ -232,64 +230,7 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
         )}
       </div>
 
-      {/* Online/Offline Toggle - Hidden for modes like Clash Squad */}
-      {!hideLocation && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Tournament Location
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => onChange({ is_online: true, venue: undefined })}
-              className={`p-4 rounded-xl border-2 text-center transition-all
-                ${data.is_online
-                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
-                }`}
-            >
-              <span className="text-2xl">🌐</span>
-              <div className="font-medium text-gray-900 dark:text-white mt-2">Online</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Play from anywhere</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ is_online: false })}
-              className={`p-4 rounded-xl border-2 text-center transition-all
-                ${!data.is_online
-                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
-                }`}
-            >
-              <span className="text-2xl">📍</span>
-              <div className="font-medium text-gray-900 dark:text-white mt-2">Offline</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">At a venue</div>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Venue (if offline and location not hidden) */}
-      {!hideLocation && !data.is_online && (
-        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Venue Name *
-          </label>
-          <input
-            type="text"
-            value={data.venue || ''}
-            onChange={(e) => onChange({ venue: e.target.value })}
-            placeholder="e.g., Gaming Arena, City Convention Center"
-            className={`w-full px-4 py-3 border rounded-xl bg-white dark:bg-gray-800 
-                       text-gray-900 dark:text-white placeholder-gray-400
-                       focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition
-                       ${errors.venue ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'}`}
-          />
-          {errors.venue && (
-            <p className="mt-1 text-sm text-red-500">{errors.venue}</p>
-          )}
-        </div>
-      )}
+      {/* Tournament Location removed - all tournaments are online */}
 
       {/* Entry Fee & Prize Pool */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -299,8 +240,13 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
           </label>
           <input
             type="number"
-            value={data.entry_fee}
-            onChange={(e) => onChange({ entry_fee: parseInt(e.target.value) || 0 })}
+            value={data.entry_fee || ''}
+            onChange={(e) => onChange({ entry_fee: e.target.value === '' ? 0 : parseInt(e.target.value) || 0 })}
+            onFocus={(e) => {
+              if (data.entry_fee === 0) {
+                e.target.value = '';
+              }
+            }}
             min={0}
             className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl 
                       bg-white dark:bg-gray-800 text-gray-900 dark:text-white

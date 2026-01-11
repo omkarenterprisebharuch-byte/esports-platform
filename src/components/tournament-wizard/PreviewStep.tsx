@@ -110,17 +110,6 @@ export default function PreviewStep({ gameId, modeId, basicInfo, schedule, rules
               </div>
             </div>
 
-            {/* Location Badge */}
-            <div className="mt-4">
-              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium
-                ${basicInfo.is_online
-                  ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
-                  : "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400"
-                }`}>
-                {basicInfo.is_online ? "🌐 Online Tournament" : `📍 ${basicInfo.venue || "Offline Venue"}`}
-              </span>
-            </div>
-
             {/* Schedule Info */}
             <div className="mt-6 space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">

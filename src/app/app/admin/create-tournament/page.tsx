@@ -173,29 +173,33 @@ export default function CreateTournamentWizard() {
     const maxTeams = getMaxTeams(gameId, firstMode.id, defaultTeamSize);
     const defaultFormat = firstMode.supportedFormats?.[0] || 'single_elimination';
 
-    setFormData({
+    setFormData((prev) => ({
       game_id: gameId,
       mode_id: firstMode.id,
       basicInfo: {
-        tournament_name: "",
+        // In edit mode, preserve tournament name and map if they exist
+        tournament_name: isEditMode ? prev.basicInfo.tournament_name : "",
         team_size: defaultTeamSize,
         max_teams: maxTeams,
-        entry_fee: 0,
-        prize_pool: gameConfig.prizeSuggestions[2] || 500,
-        map_name: gameConfig.defaultMap,
+        entry_fee: isEditMode ? prev.basicInfo.entry_fee : 0,
+        prize_pool: isEditMode ? prev.basicInfo.prize_pool : (gameConfig.prizeSuggestions[2] || 500),
+        // In edit mode, preserve map if the new game supports it, otherwise use default
+        map_name: isEditMode && gameConfig.maps.includes(prev.basicInfo.map_name) 
+          ? prev.basicInfo.map_name 
+          : gameConfig.defaultMap,
         is_online: true,
         bracket_format: defaultFormat,
       },
-      schedule: {
+      schedule: isEditMode ? prev.schedule : {
         ...smartDates,
         schedule_type: "once",
         publish_time: "",
       },
-      rules: {
+      rules: isEditMode ? prev.rules : {
         description: gameConfig.defaultDescription,
         match_rules: gameConfig.defaultRules,
       },
-    });
+    }));
   };
 
   // Handle mode change
@@ -215,8 +219,8 @@ export default function CreateTournamentWizard() {
         team_size: defaultTeamSize,
         max_teams: maxTeams,
         bracket_format: defaultFormat,
-        // Reset location to online if mode hides location
-        is_online: modeConfig.hideLocation ? true : prev.basicInfo.is_online,
+        // All tournaments are online
+        is_online: true,
       },
     }));
   };
@@ -280,12 +284,6 @@ export default function CreateTournamentWizard() {
           validation.errors.forEach((err, idx) => {
             newErrors[`config_${idx}`] = err;
           });
-        }
-
-        // Check location only if not hidden for this mode
-        const currentModeConfig = getGameMode(formData.game_id, formData.mode_id);
-        if (!currentModeConfig?.hideLocation && !formData.basicInfo.is_online && !formData.basicInfo.venue?.trim()) {
-          newErrors.venue = "Venue is required for offline tournaments";
         }
         break;
 
