@@ -1,6 +1,16 @@
 "use client";
 
-import { getGameConfig, getGameMode, getMaxTeams, TeamSizeOption } from "@/lib/game-config";
+import { 
+  getGameConfig, 
+  getGameMode, 
+  getMaxTeams, 
+  shouldHideLocation, 
+  isMapRequired,
+  getSupportedFormats,
+  BRACKET_FORMATS,
+  TeamSizeOption,
+  BracketFormat
+} from "@/lib/game-config";
 
 export interface BasicInfoData {
   tournament_name: string;
@@ -11,6 +21,7 @@ export interface BasicInfoData {
   map_name: string;
   is_online: boolean;
   venue?: string;
+  bracket_format: BracketFormat;
 }
 
 interface BasicInfoStepProps {
@@ -36,12 +47,15 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
   const teamSizes = modeConfig.teamSizes;
   const isTeamsLocked = modeConfig.maxTeams === 2;
   const currentMaxTeams = getMaxTeams(gameId, modeId, data.team_size);
+  const hideLocation = shouldHideLocation(gameId, modeId);
+  const mapRequired = isMapRequired(gameId, modeId);
+  const supportedFormats = getSupportedFormats(gameId, modeId);
 
   const handleTeamSizeChange = (size: number) => {
     const newMaxTeams = getMaxTeams(gameId, modeId, size);
     onChange({
       team_size: size,
-      // If max teams is locked (e.g., BGMI always 2 teams), set it automatically
+      // If max teams is locked (e.g., TDM always 2 teams), set it automatically
       max_teams: isTeamsLocked ? 2 : Math.min(data.max_teams, newMaxTeams),
     });
   };
@@ -155,7 +169,7 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
       {gameConfig.maps.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Map
+            Map {mapRequired && <span className="text-red-500">*</span>}
           </label>
           <div className="flex flex-wrap gap-2">
             {gameConfig.maps.map((map) => (
@@ -173,46 +187,90 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
               </button>
             ))}
           </div>
+          {mapRequired && !data.map_name && (
+            <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+              ⚠️ Map selection is required for {modeConfig.name}
+            </p>
+          )}
+          {errors.map_name && (
+            <p className="mt-1 text-sm text-red-500">{errors.map_name}</p>
+          )}
         </div>
       )}
 
-      {/* Online/Offline Toggle */}
+      {/* Bracket Format */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Tournament Location
+          Tournament Format *
         </label>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => onChange({ is_online: true, venue: undefined })}
-            className={`p-4 rounded-xl border-2 text-center transition-all
-              ${data.is_online
-                ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
-              }`}
-          >
-            <span className="text-2xl">🌐</span>
-            <div className="font-medium text-gray-900 dark:text-white mt-2">Online</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Play from anywhere</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ is_online: false })}
-            className={`p-4 rounded-xl border-2 text-center transition-all
-              ${!data.is_online
-                ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
-              }`}
-          >
-            <span className="text-2xl">📍</span>
-            <div className="font-medium text-gray-900 dark:text-white mt-2">Offline</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">At a venue</div>
-          </button>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {supportedFormats.map((formatId) => {
+            const format = BRACKET_FORMATS[formatId];
+            return (
+              <button
+                key={formatId}
+                type="button"
+                onClick={() => onChange({ bracket_format: formatId })}
+                className={`p-3 rounded-xl border-2 text-left transition-all
+                  ${data.bracket_format === formatId
+                    ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                    : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
+                  }`}
+              >
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {format.label}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {format.description}
+                </div>
+              </button>
+            );
+          })}
         </div>
+        {errors.bracket_format && (
+          <p className="mt-1 text-sm text-red-500">{errors.bracket_format}</p>
+        )}
       </div>
 
-      {/* Venue (if offline) */}
-      {!data.is_online && (
+      {/* Online/Offline Toggle - Hidden for modes like Clash Squad */}
+      {!hideLocation && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Tournament Location
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onChange({ is_online: true, venue: undefined })}
+              className={`p-4 rounded-xl border-2 text-center transition-all
+                ${data.is_online
+                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
+                }`}
+            >
+              <span className="text-2xl">🌐</span>
+              <div className="font-medium text-gray-900 dark:text-white mt-2">Online</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Play from anywhere</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange({ is_online: false })}
+              className={`p-4 rounded-xl border-2 text-center transition-all
+                ${!data.is_online
+                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
+                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300"
+                }`}
+            >
+              <span className="text-2xl">📍</span>
+              <div className="font-medium text-gray-900 dark:text-white mt-2">Offline</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">At a venue</div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Venue (if offline and location not hidden) */}
+      {!hideLocation && !data.is_online && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-200">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Venue Name *
@@ -295,7 +353,7 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
       {/* Configuration Summary */}
       <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
         <h4 className="font-medium text-gray-900 dark:text-white mb-3">Configuration Summary</h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
           <div>
             <span className="text-gray-500 dark:text-gray-400">Game</span>
             <p className="font-medium text-gray-900 dark:text-white">{gameConfig.name}</p>
@@ -306,12 +364,26 @@ export default function BasicInfoStep({ gameId, modeId, data, onChange, errors }
           </div>
           <div>
             <span className="text-gray-500 dark:text-gray-400">Team Size</span>
-            <p className="font-medium text-gray-900 dark:text-white">{data.team_size}v{data.team_size}</p>
+            <p className="font-medium text-gray-900 dark:text-white">
+              {teamSizes.find(ts => ts.value === data.team_size)?.label || `${data.team_size}v${data.team_size}`}
+            </p>
           </div>
           <div>
-            <span className="text-gray-500 dark:text-gray-400">Max Teams</span>
+            <span className="text-gray-500 dark:text-gray-400">Max Registrations</span>
             <p className="font-medium text-gray-900 dark:text-white">{data.max_teams}</p>
           </div>
+          <div>
+            <span className="text-gray-500 dark:text-gray-400">Format</span>
+            <p className="font-medium text-gray-900 dark:text-white">
+              {BRACKET_FORMATS[data.bracket_format]?.label || 'Not selected'}
+            </p>
+          </div>
+          {data.map_name && (
+            <div>
+              <span className="text-gray-500 dark:text-gray-400">Map</span>
+              <p className="font-medium text-gray-900 dark:text-white">{data.map_name}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

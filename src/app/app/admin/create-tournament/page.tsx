@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { secureFetch } from "@/lib/api-client";
 import { PageHeader } from "@/components/app/PageHeader";
 import {
@@ -15,7 +15,7 @@ import {
   ScheduleData,
   RulesData,
 } from "@/components/tournament-wizard";
-import { getGameConfig, getGameMode, getMaxTeams, generateSmartDates } from "@/lib/game-config";
+import { getGameConfig, getGameMode, getMaxTeams, generateSmartDates, BracketFormat } from "@/lib/game-config";
 import { validateTournamentConfig } from "@/lib/game-config";
 
 const WIZARD_STEPS = [
@@ -46,8 +46,13 @@ interface WizardFormData {
  */
 export default function CreateTournamentWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
+  const isEditMode = !!editId;
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(isEditMode);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
@@ -63,6 +68,7 @@ export default function CreateTournamentWizard() {
       prize_pool: 500,
       map_name: "Bermuda",
       is_online: true,
+      bracket_format: "battle_royale",
     },
     schedule: {
       registration_start_date: "",
@@ -78,7 +84,7 @@ export default function CreateTournamentWizard() {
     },
   });
 
-  // Check authorization
+  // Check authorization and load tournament data if editing
   useEffect(() => {
     secureFetch("/api/auth/me")
       .then((res) => res.json())
@@ -89,6 +95,10 @@ export default function CreateTournamentWizard() {
             router.push("/app");
           } else {
             setIsAuthorized(true);
+            // Load tournament data if editing
+            if (editId) {
+              loadTournamentData(editId);
+            }
           }
         } else {
           router.push("/login");
@@ -97,7 +107,60 @@ export default function CreateTournamentWizard() {
       .catch(() => {
         router.push("/login");
       });
-  }, [router]);
+  }, [router, editId]);
+
+  // Load existing tournament for editing
+  const loadTournamentData = async (tournamentId: string) => {
+    try {
+      setIsLoading(true);
+      const res = await secureFetch(`/api/tournaments/${tournamentId}`);
+      const data = await res.json();
+      
+      if (data.success && data.data) {
+        const t = data.data;
+        
+        // Format dates for datetime-local input
+        const formatDateForInput = (dateStr: string) => {
+          if (!dateStr) return "";
+          const d = new Date(dateStr);
+          return d.toISOString().slice(0, 16);
+        };
+        
+        setFormData({
+          game_id: t.game_type || "freefire",
+          mode_id: t.game_mode || "br_ranked",
+          basicInfo: {
+            tournament_name: t.tournament_name || "",
+            team_size: t.team_size || 4,
+            max_teams: t.max_teams || 12,
+            entry_fee: t.entry_fee || 0,
+            prize_pool: t.prize_pool || 500,
+            map_name: t.map_name || "",
+            is_online: t.is_online !== false,
+            venue: t.venue || "",
+            bracket_format: (t.bracket_format || "battle_royale") as BracketFormat,
+          },
+          schedule: {
+            registration_start_date: formatDateForInput(t.registration_start_date),
+            registration_end_date: formatDateForInput(t.registration_end_date),
+            tournament_start_date: formatDateForInput(t.tournament_start_date),
+            tournament_end_date: formatDateForInput(t.tournament_end_date),
+            schedule_type: t.schedule_type || "once",
+            publish_time: t.publish_time || "",
+          },
+          rules: {
+            description: t.description || "",
+            match_rules: t.match_rules || "",
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load tournament:", error);
+      setMessage({ type: "error", text: "Failed to load tournament data" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Apply game defaults when game changes
   const handleGameChange = (gameId: string) => {
@@ -108,6 +171,7 @@ export default function CreateTournamentWizard() {
     const smartDates = generateSmartDates(gameId);
     const defaultTeamSize = firstMode.teamSizes[firstMode.teamSizes.length - 1]?.value || 4;
     const maxTeams = getMaxTeams(gameId, firstMode.id, defaultTeamSize);
+    const defaultFormat = firstMode.supportedFormats?.[0] || 'single_elimination';
 
     setFormData({
       game_id: gameId,
@@ -120,6 +184,7 @@ export default function CreateTournamentWizard() {
         prize_pool: gameConfig.prizeSuggestions[2] || 500,
         map_name: gameConfig.defaultMap,
         is_online: true,
+        bracket_format: defaultFormat,
       },
       schedule: {
         ...smartDates,
@@ -140,6 +205,7 @@ export default function CreateTournamentWizard() {
 
     const defaultTeamSize = modeConfig.teamSizes[modeConfig.teamSizes.length - 1]?.value || 4;
     const maxTeams = getMaxTeams(formData.game_id, modeId, defaultTeamSize);
+    const defaultFormat = modeConfig.supportedFormats?.[0] || 'single_elimination';
 
     setFormData((prev) => ({
       ...prev,
@@ -148,6 +214,9 @@ export default function CreateTournamentWizard() {
         ...prev.basicInfo,
         team_size: defaultTeamSize,
         max_teams: maxTeams,
+        bracket_format: defaultFormat,
+        // Reset location to online if mode hides location
+        is_online: modeConfig.hideLocation ? true : prev.basicInfo.is_online,
       },
     }));
   };
@@ -199,12 +268,13 @@ export default function CreateTournamentWizard() {
           newErrors.tournament_name = "Tournament name must be at least 3 characters";
         }
         
-        // Validate game/mode/teamSize combination
+        // Validate game/mode/teamSize combination including map
         const validation = validateTournamentConfig(
           formData.game_id,
           formData.mode_id,
           formData.basicInfo.team_size,
-          formData.basicInfo.max_teams
+          formData.basicInfo.max_teams,
+          formData.basicInfo.map_name
         );
         if (!validation.valid) {
           validation.errors.forEach((err, idx) => {
@@ -212,7 +282,9 @@ export default function CreateTournamentWizard() {
           });
         }
 
-        if (!formData.basicInfo.is_online && !formData.basicInfo.venue?.trim()) {
+        // Check location only if not hidden for this mode
+        const currentModeConfig = getGameMode(formData.game_id, formData.mode_id);
+        if (!currentModeConfig?.hideLocation && !formData.basicInfo.is_online && !formData.basicInfo.venue?.trim()) {
           newErrors.venue = "Venue is required for offline tournaments";
         }
         break;
@@ -305,20 +377,28 @@ export default function CreateTournamentWizard() {
     };
 
     try {
-      const res = await secureFetch("/api/tournaments", {
-        method: "POST",
+      // Use PUT for edit, POST for create
+      const url = isEditMode 
+        ? `/api/tournaments/${editId}` 
+        : "/api/tournaments";
+      
+      const res = await secureFetch(url, {
+        method: isEditMode ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        setMessage({ type: "success", text: data.message || "Tournament created successfully!" });
+        setMessage({ 
+          type: "success", 
+          text: data.message || (isEditMode ? "Tournament updated successfully!" : "Tournament created successfully!") 
+        });
         setTimeout(() => {
           router.push("/app/admin");
         }, 1500);
       } else {
-        setMessage({ type: "error", text: data.message || "Failed to create tournament" });
+        setMessage({ type: "error", text: data.message || `Failed to ${isEditMode ? "update" : "create"} tournament` });
       }
     } catch {
       setMessage({ type: "error", text: "An error occurred. Please try again." });
@@ -327,7 +407,7 @@ export default function CreateTournamentWizard() {
     }
   };
 
-  if (isAuthorized === null) {
+  if (isAuthorized === null || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
@@ -339,7 +419,7 @@ export default function CreateTournamentWizard() {
     <div className="space-y-6">
       {/* Header */}
       <PageHeader
-        title="Create Tournament"
+        title={isEditMode ? "Edit Tournament" : "Create Tournament"}
         subtitle={`Step ${currentStep} of ${WIZARD_STEPS.length}: ${WIZARD_STEPS[currentStep - 1].name}`}
         backLink={{ href: "/app/admin", label: "Back to Admin" }}
       />
@@ -425,6 +505,7 @@ export default function CreateTournamentWizard() {
             basicInfo={formData.basicInfo}
             schedule={formData.schedule}
             rules={formData.rules}
+            isEditMode={isEditMode}
           />
         )}
       </div>
@@ -466,18 +547,33 @@ export default function CreateTournamentWizard() {
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white 
-                     rounded-xl font-medium hover:from-green-600 hover:to-emerald-700 
-                     transition flex items-center gap-2 shadow-lg disabled:opacity-50"
+            className={`px-8 py-3 ${isEditMode 
+              ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700" 
+              : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+            } text-white rounded-xl font-medium transition flex items-center gap-2 shadow-lg disabled:opacity-50`}
           >
             {isSubmitting ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                Publishing...
+                {isEditMode ? "Updating..." : "Publishing..."}
               </>
             ) : (
               <>
-                🚀 Publish Tournament
+                {isEditMode ? (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Update Tournament
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    Publish Tournament
+                  </>
+                )}
               </>
             )}
           </button>

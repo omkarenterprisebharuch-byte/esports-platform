@@ -1,6 +1,6 @@
 "use client";
 
-import { getGameConfig, getGameMode } from "@/lib/game-config";
+import { getGameConfig, getGameMode, BRACKET_FORMATS } from "@/lib/game-config";
 import { BasicInfoData } from "./BasicInfoStep";
 import { ScheduleData } from "./ScheduleStep";
 import { RulesData } from "./RulesStep";
@@ -11,11 +11,13 @@ interface PreviewStepProps {
   basicInfo: BasicInfoData;
   schedule: ScheduleData;
   rules: RulesData;
+  isEditMode?: boolean;
 }
 
-export default function PreviewStep({ gameId, modeId, basicInfo, schedule, rules }: PreviewStepProps) {
+export default function PreviewStep({ gameId, modeId, basicInfo, schedule, rules, isEditMode = false }: PreviewStepProps) {
   const gameConfig = getGameConfig(gameId);
   const modeConfig = getGameMode(gameId, modeId);
+  const teamSizeLabel = modeConfig?.teamSizes.find(ts => ts.value === basicInfo.team_size)?.label || `${basicInfo.team_size}v${basicInfo.team_size}`;
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Not set";
@@ -34,10 +36,10 @@ export default function PreviewStep({ gameId, modeId, basicInfo, schedule, rules
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Review & Publish
+          {isEditMode ? "Review & Update" : "Review & Publish"}
         </h2>
         <p className="text-gray-500 dark:text-gray-400 mt-2">
-          Review your tournament details before publishing
+          {isEditMode ? "Review your changes before updating" : "Review your tournament details before publishing"}
         </p>
       </div>
 
@@ -57,7 +59,7 @@ export default function PreviewStep({ gameId, modeId, basicInfo, schedule, rules
                   {basicInfo.tournament_name || "Untitled Tournament"}
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400">
-                  {gameConfig.name} • {modeConfig.name} • {basicInfo.team_size}v{basicInfo.team_size}
+                  {gameConfig.name} • {modeConfig.name} • {teamSizeLabel}
                 </p>
               </div>
               <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 
@@ -67,18 +69,26 @@ export default function PreviewStep({ gameId, modeId, basicInfo, schedule, rules
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mt-6">
               <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
                 <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                   {basicInfo.max_teams}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Teams</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {basicInfo.team_size === 1 ? "Players" : "Teams"}
+                </p>
               </div>
               <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
                 <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {basicInfo.team_size}v{basicInfo.team_size}
+                  {teamSizeLabel}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Team Size</p>
+              </div>
+              <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                  {BRACKET_FORMATS[basicInfo.bracket_format]?.label || "N/A"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Format</p>
               </div>
               <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
                 <p className="text-2xl font-bold text-green-600 dark:text-green-400">

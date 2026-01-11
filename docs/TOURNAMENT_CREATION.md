@@ -1,117 +1,132 @@
-# Tournament Creation System - Game Rules & Data Model
+# Tournament Creation System - Implementation Guide
 
 ## 📋 Overview
 
-This document describes the tournament creation system with game-specific rules, modes, team sizes, and validation constraints.
-
-## 🎯 Core Data Model
-
-### Tournament Required Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Tournament name (3-100 chars) |
-| `game` | enum | Game identifier: `freefire`, `bgmi`, `valorant`, `codm` |
-| `mode` | string | Game-specific mode identifier |
-| `teamSize` | number | Players per team (1-5) |
-| `maxTeams` | number | Maximum teams allowed (2-100) |
-| `registrationStartDate` | datetime | When registration opens |
-| `registrationEndDate` | datetime | When registration closes |
-| `tournamentStartDate` | datetime | Tournament start time |
-| `isOnline` | boolean | Online or offline tournament |
-
-### Optional Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `description` | string | Tournament description (max 2000 chars) |
-| `rules` | string | Match rules (max 5000 chars) |
-| `mapName` | string | Map selection |
-| `entryFee` | number | Entry fee in ₹ (min 0) |
-| `prizePool` | number | Prize pool in ₹ (min 0) |
-| `venue` | string | Venue name (required if offline) |
-| `tournamentEndDate` | datetime | Tournament end time |
+Tournament creation form for event organizers with strict game-specific rules and validation.
 
 ---
 
-## 🎮 Game Rules & Constraints
+## 🎯 Core Data Model (Minimum)
+
+```typescript
+interface TournamentPayload {
+  // Required
+  name: string;                    // Tournament name (3-100 chars)
+  game: 'freefire' | 'bgmi' | 'valorant' | 'codm';
+  mode: string;                    // Game-specific mode ID
+  bracket_format: BracketFormat;   // Tournament format
+  team_size: number;               // Players per team
+  max_teams: number;               // Max teams/players allowed
+  
+  // Registration
+  registration_start_date: string; // ISO datetime
+  registration_end_date: string;   // ISO datetime
+  tournament_start_date: string;   // ISO datetime
+  tournament_end_date: string;     // ISO datetime
+  
+  // Optional
+  map_name?: string;               // Required for BGMI BR
+  entry_fee?: number;              // Entry fee in ₹
+  prize_pool?: number;             // Prize pool in ₹
+  is_online?: boolean;             // Hidden for Clash Squad
+  venue?: string;                  // Required if offline
+  description?: string;            // Max 2000 chars
+  rules?: string;                  // Max 5000 chars (Markdown)
+}
+
+type BracketFormat = 
+  | 'single_elimination' 
+  | 'double_elimination' 
+  | 'round_robin' 
+  | 'swiss' 
+  | 'battle_royale';
+```
+
+---
+
+## 🎮 Game Rules & Constraints (STRICT)
 
 ### 🔥 Free Fire
 
-#### BR Ranked Mode
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| Solo (1) | 48 | 48 players battle royale |
-| Duo (2) | 24 | 24 teams of 2 players |
-| Squad (4) | 12 | 12 squads of 4 players |
+#### 1️⃣ BR Ranked
 
-**Maps:** Bermuda, Purgatory, Kalahari, Nextera, Alpine
+| Team Size | Label | Max Registrations | Description |
+|-----------|-------|-------------------|-------------|
+| 1 | Solo | 48 | 48 players free-for-all |
+| 2 | Duo | 24 | 24 teams of 2 players |
+| 4 | Squad | 12 | 12 squads of 4 players |
 
-#### Clash Squad Mode
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| 1v1 | 2 | 1 player per team |
-| 2v2 | 2 | 2 players per team |
-| 3v3 | 2 | 3 players per team |
-| 4v4 | 2 | 4 players per team |
+**Maps:** Bermuda, Purgatory, Kalahari, Nextera, Alpine  
+**Supported Formats:** `battle_royale`, `round_robin`
 
-⚠️ **Constraint:** Clash Squad always has exactly **2 teams**
+#### 2️⃣ Clash Squad
+
+| Team Size | Label | Max Registrations | Description |
+|-----------|-------|-------------------|-------------|
+| 1 | 1v1 | 2 | Single player vs single player |
+| 2 | 2v2 | 2 | 2 players per team |
+| 3 | 3v3 | 2 | 3 players per team |
+| 4 | 4v4 | 2 | 4 players per team |
+
+**⚠️ STRICT RULES:**
+- ❌ **NO** tournament location field (always online)
+- ✅ **Exactly 2 teams** always
+- **Supported Formats:** `single_elimination`, `double_elimination`, `round_robin`
 
 ---
 
 ### 🟢 BGMI (Battlegrounds Mobile India)
 
-#### BR Mode
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| 1v1 | 2 | Single player vs single player |
-| 2v2 | 2 | 2 players per team |
-| 3v3 | 2 | 3 players per team |
-| 4v4 | 2 | 4 players per team |
+#### 1️⃣ Battle Royale
 
-**Maps:** Erangel, Miramar, Sanhok, Vikendi, Livik, Karakin
+| Team Size | Label | Max Registrations | Description |
+|-----------|-------|-------------------|-------------|
+| 1 | Solo | 100 | 100 players (individual) |
+| 2 | Duo | 50 | 50 teams (2 players each) |
+| 4 | Squad | 25 | 25 teams (4 players each) |
 
-#### TDM Mode
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| 1v1 | 2 | Single player vs single player |
-| 2v2 | 2 | 2 players per team |
-| 3v3 | 2 | 3 players per team |
-| 4v4 | 2 | 4 players per team |
+**Maps:** Erangel, Miramar, Sanhok, Vikendi, Livik, Karakin  
+**⚠️ Map selection is REQUIRED**  
+**Supported Formats:** `battle_royale`, `round_robin`
 
-⚠️ **Constraint:** BGMI tournaments always have exactly **2 teams**
+#### 2️⃣ TDM (Team Deathmatch)
+
+| Team Size | Label | Max Registrations | Description |
+|-----------|-------|-------------------|-------------|
+| 1 | 1v1 | 2 | Single player vs single player |
+| 2 | 2v2 | 2 | 2 players per team |
+| 3 | 3v3 | 2 | 3 players per team |
+| 4 | 4v4 | 2 | 4 players per team |
+
+**⚠️ STRICT RULES:**
+- ✅ **Exactly 2 teams** always
+- **Supported Formats:** `single_elimination`, `double_elimination`, `round_robin`
 
 ---
 
-### 🔵 Valorant (Placeholder)
+### 🔵 Valorant (Placeholder - Coming Soon)
 
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| 5v5 | 16 | Standard 5v5 competitive |
+| Team Size | Label | Max Teams |
+|-----------|-------|-----------|
+| 5 | 5v5 | 16 |
 
 **Maps:** Ascent, Bind, Haven, Split, Icebox, Breeze, Fracture, Pearl, Lotus, Sunset
 
-📌 **Status:** Coming Soon
-
 ---
 
-### 🎯 CODM (Placeholder)
+### 🎯 CODM (Placeholder - Coming Soon)
 
 #### BR Mode
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| Solo | 100 | 100 players BR |
-| Duo | 50 | 50 teams of 2 |
-| Squad | 25 | 25 squads of 4 |
+| Team Size | Max Registrations |
+|-----------|-------------------|
+| Solo | 100 |
+| Duo | 50 |
+| Squad | 25 |
 
 #### Multiplayer Mode
-| Team Size | Max Teams | Description |
-|-----------|-----------|-------------|
-| 5v5 | 2 | Standard multiplayer |
-
-**Maps:** Isolated, Blackout, Alcatraz
-
-📌 **Status:** Coming Soon
+| Team Size | Max Teams |
+|-----------|-----------|
+| 5v5 | 2 |
 
 ---
 
@@ -119,409 +134,255 @@ This document describes the tournament creation system with game-specific rules,
 
 ### Game → Mode → Team Size Dependency
 
-```javascript
-// Valid combinations
-const VALID_GAME_CONFIGS = {
-  freefire: {
-    br_ranked: [1, 2, 4],      // Solo, Duo, Squad
-    clash_squad: [1, 2, 3, 4], // 1v1, 2v2, 3v3, 4v4
-  },
-  bgmi: {
-    br: [1, 2, 3, 4],          // Always 2 teams
-    tdm: [1, 2, 3, 4],         // Always 2 teams
-  },
-  valorant: {
-    competitive: [5],          // 5v5 only
-  },
-  codm: {
-    br: [1, 2, 4],             // Solo, Duo, Squad
-    multiplayer: [5],          // 5v5 only
-  },
-};
+```typescript
+function validateConfig(game: string, mode: string, teamSize: number, maxTeams: number, map?: string) {
+  // 1. Check valid game
+  if (!GAME_CONFIGS[game]) return { valid: false, error: 'Invalid game' };
+  
+  // 2. Check valid mode for game
+  const modeConfig = GAME_CONFIGS[game].modes.find(m => m.id === mode);
+  if (!modeConfig) return { valid: false, error: 'Invalid mode for game' };
+  
+  // 3. Check valid team size for mode
+  const teamSizeOption = modeConfig.teamSizes.find(ts => ts.value === teamSize);
+  if (!teamSizeOption) return { valid: false, error: 'Invalid team size for mode' };
+  
+  // 4. Check max teams doesn't exceed limit
+  if (maxTeams > teamSizeOption.maxRegistrations) {
+    return { valid: false, error: `Max registrations: ${teamSizeOption.maxRegistrations}` };
+  }
+  
+  // 5. Check map required
+  if (modeConfig.requiresMap && !map) {
+    return { valid: false, error: 'Map selection required' };
+  }
+  
+  return { valid: true };
+}
 ```
 
-### Max Teams Enforcement
+### Enforced Constraints
 
-```javascript
-const MAX_TEAMS_CONFIG = {
-  freefire: {
-    br_ranked: { 1: 48, 2: 24, 4: 12 },
-    clash_squad: { 1: 2, 2: 2, 3: 2, 4: 2 },
-  },
-  bgmi: {
-    br: { 1: 2, 2: 2, 3: 2, 4: 2 },
-    tdm: { 1: 2, 2: 2, 3: 2, 4: 2 },
-  },
-  valorant: {
-    competitive: { 5: 16 },
-  },
-  codm: {
-    br: { 1: 100, 2: 50, 4: 25 },
-    multiplayer: { 5: 2 },
-  },
-};
-```
-
-### Date Validation
-- `registrationEndDate` > `registrationStartDate`
-- `tournamentStartDate` >= `registrationEndDate`
-- `tournamentEndDate` > `tournamentStartDate` (if provided)
-
-### Offline Tournament Validation
-- If `isOnline === false`, then `venue` is required
+| Rule | Enforcement |
+|------|-------------|
+| Player caps (Solo/Duo/Squad) | Auto-set based on team size |
+| Team caps (Clash Squad/TDM) | Locked to 2, cannot change |
+| Map selection (BGMI BR) | Required, validation fails without |
+| Location field (Clash Squad) | Hidden from UI completely |
+| Invalid submissions | Submit button disabled |
 
 ---
 
-## 🖥️ UI Wireframe (Text-Based)
+## 🖥️ UI / UX Requirements
+
+### Dynamic Form Behavior
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ Create Tournament                                           │
-│ Step 1 of 5: Game                                          │
+│  Step 1: Game Selection                                      │
 ├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Choose Your Game                                           │
-│  ─────────────────                                          │
-│                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │ 🔥 Free Fire    │  │ 🎮 BGMI        │                  │
-│  │ 2 modes        ✓│  │ 2 modes         │                  │
-│  │ BR, Clash Squad │  │ BR, TDM         │                  │
-│  └─────────────────┘  └─────────────────┘                  │
-│                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │ ⚔️ Valorant     │  │ 🎯 CODM        │                  │
-│  │ Coming Soon     │  │ Coming Soon     │                  │
-│  └─────────────────┘  └─────────────────┘                  │
-│                                                             │
-│  Select Mode for Free Fire                                  │
-│  ─────────────────────────                                  │
-│                                                             │
-│  ┌───────────────────────┐  ┌───────────────────────┐      │
-│  │ BR Ranked           ✓ │  │ Clash Squad           │      │
-│  │ Classic BR mode       │  │ 4v4 tactical mode     │      │
-│  │ Solo, Duo, Squad      │  │ ⚠️ Always 2 teams    │      │
-│  └───────────────────────┘  └───────────────────────┘      │
-│                                                             │
-│  ┌──────────┐                                ┌──────────┐  │
-│  │  Back    │                                │   Next   │  │
-│  └──────────┘                                └──────────┘  │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│ Create Tournament                                           │
-│ Step 2 of 5: Details                                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Tournament Name *                                          │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ Free Fire Championship                              │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  Team Size *                                                │
-│  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐                   │
-│  │ 1v1  │  │ 2v2  │  │ 3v3  │  │ 4v4 ✓│                   │
-│  └──────┘  └──────┘  └──────┘  └──────┘                   │
-│                                                             │
-│  Max Teams *                                                │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │ 12                                                  │   │
-│  └─────────────────────────────────────────────────────┘   │
-│  Maximum allowed for Squad: 12                              │
-│                                                             │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │ ⚠️ Clash Squad mode always has 2 teams            │    │
-│  │ This is a game restriction and cannot be changed.  │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                             │
-│  Tournament Location                                        │
-│  ┌───────────────┐  ┌───────────────┐                      │
-│  │ 🌐 Online   ✓ │  │ 📍 Offline    │                      │
-│  └───────────────┘  └───────────────┘                      │
-│                                                             │
-│  Map                                                        │
-│  [Bermuda✓] [Purgatory] [Kalahari] [Nextera] [Alpine]      │
-│                                                             │
-│  Entry Fee (₹)              Prize Pool (₹)                  │
-│  ┌────────────┐             ┌────────────┐                 │
-│  │ 50         │             │ 1000       │                 │
-│  └────────────┘             └────────────┘                 │
-│  [Free] [₹10] [₹25] [₹50]   [₹100] [₹250] [₹500] [₹1000]  │
-│                                                             │
-│  ┌──────────┐                                ┌──────────┐  │
-│  │  Back    │                                │   Next   │  │
-│  └──────────┘                                └──────────┘  │
+│  [🔥 Free Fire]  [🎮 BGMI]  [⚔️ Valorant*] [🎯 CODM*]      │
+│                                   * Coming Soon              │
+│                                                              │
+│  Mode Selection (after game selected):                       │
+│  ┌────────────────────┐ ┌────────────────────┐              │
+│  │ BR Ranked          │ │ Clash Squad        │              │
+│  │ Solo, Duo, Squad   │ │ 1v1, 2v2, 3v3, 4v4 │              │
+│  │                    │ │ ⚠️ Always 2 teams  │              │
+│  │                    │ │ 🌐 Online only     │              │
+│  └────────────────────┘ └────────────────────┘              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step 2: Details                                             │
+├─────────────────────────────────────────────────────────────┤
+│  Tournament Name: [____________________________]            │
+│                                                              │
+│  Team Size: [Solo] [Duo] [Squad]  ← Dynamic based on mode   │
+│                                                              │
+│  Max Registrations: [24]  ← Auto-calculated / locked        │
+│  ⚠️ TDM mode always has 2 teams (locked)                    │
+│                                                              │
+│  Map: [Erangel*] [Miramar] [Sanhok]  ← *Required for BGMI BR│
+│                                                              │
+│  Format: [Single Elim] [Double Elim] [Battle Royale]        │
+│                                                              │
+│  Location: [🌐 Online] [📍 Offline]  ← Hidden for Clash Squad│
+│                                                              │
+│  Entry Fee: [₹0]  Prize Pool: [₹500]                        │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │ Config Summary: BGMI | BR | Duo | 50 teams | Erangel│    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Conditional Fields
+
+| Condition | Field Behavior |
+|-----------|----------------|
+| Game = Free Fire, Mode = Clash Squad | Hide location field |
+| Game = BGMI, Mode = BR | Map field required |
+| Mode.maxTeams = 2 | Lock max teams, show warning |
+| is_online = false | Show venue field |
+
+### Error Display
+
+- Inline errors below each field
+- Summary errors at form top
+- Submit disabled until all errors cleared
 
 ---
 
-## 📦 JSON Schema
+## 💾 API / Data Persistence
+
+### JSON Payload Structure
 
 ```json
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Tournament",
-  "type": "object",
-  "required": [
-    "name",
-    "game",
-    "mode",
-    "teamSize",
-    "maxTeams",
-    "registrationStartDate",
-    "registrationEndDate",
-    "tournamentStartDate",
-    "isOnline"
-  ],
-  "properties": {
-    "name": {
-      "type": "string",
-      "minLength": 3,
-      "maxLength": 100,
-      "description": "Tournament name"
-    },
-    "game": {
-      "type": "string",
-      "enum": ["freefire", "bgmi", "valorant", "codm"],
-      "description": "Game identifier"
-    },
-    "mode": {
-      "type": "string",
-      "description": "Game-specific mode identifier"
-    },
-    "teamSize": {
-      "type": "integer",
-      "minimum": 1,
-      "maximum": 5,
-      "description": "Number of players per team"
-    },
-    "maxTeams": {
-      "type": "integer",
-      "minimum": 2,
-      "maximum": 100,
-      "description": "Maximum number of teams allowed"
-    },
-    "registrationFields": {
-      "type": "object",
-      "properties": {
-        "requireTeamName": { "type": "boolean", "default": true },
-        "requirePlayerNames": { "type": "boolean", "default": true },
-        "requireGameIds": { "type": "boolean", "default": true },
-        "customFields": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string" },
-              "type": { "enum": ["text", "number", "select"] },
-              "required": { "type": "boolean" },
-              "options": { "type": "array", "items": { "type": "string" } }
-            }
-          }
-        }
-      }
-    },
-    "registrationStartDate": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "registrationEndDate": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "tournamentStartDate": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "tournamentEndDate": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "isOnline": {
-      "type": "boolean",
-      "default": true
-    },
-    "venue": {
-      "type": "string",
-      "maxLength": 200
-    },
-    "description": {
-      "type": "string",
-      "maxLength": 2000
-    },
-    "rules": {
-      "type": "string",
-      "maxLength": 5000
-    },
-    "mapName": {
-      "type": "string",
-      "maxLength": 100
-    },
-    "entryFee": {
-      "type": "number",
-      "minimum": 0,
-      "default": 0
-    },
-    "prizePool": {
-      "type": "number",
-      "minimum": 0,
-      "default": 0
-    }
-  }
+  "name": "string",
+  "game": "freefire|bgmi|valorant|codm",
+  "mode": "string",
+  "bracket_format": "single_elimination|double_elimination|round_robin|swiss|battle_royale",
+  "team_size": "number",
+  "max_teams": "number",
+  "map_name": "string|null",
+  "entry_fee": "number",
+  "prize_pool": "number",
+  "is_online": "boolean",
+  "venue": "string|null",
+  "registration_start_date": "ISO8601",
+  "registration_end_date": "ISO8601",
+  "tournament_start_date": "ISO8601",
+  "tournament_end_date": "ISO8601",
+  "description": "string",
+  "rules": "string"
 }
 ```
 
 ---
 
-## 📝 Example API Payloads
+## 📦 Example API Payloads
 
-### Free Fire BR Squad
+### Free Fire BR Ranked (Squad)
 
 ```json
 {
-  "name": "Free Fire BR Championship",
+  "name": "Free Fire Friday Night Battle",
   "game": "freefire",
   "mode": "br_ranked",
-  "teamSize": 4,
-  "maxTeams": 12,
-  "registrationFields": {
-    "requireTeamName": true,
-    "requirePlayerNames": true,
-    "requireGameIds": true
-  },
-  "registrationStartDate": "2026-01-12T10:00:00.000Z",
-  "registrationEndDate": "2026-01-12T14:00:00.000Z",
-  "tournamentStartDate": "2026-01-12T14:30:00.000Z",
-  "tournamentEndDate": "2026-01-12T16:30:00.000Z",
-  "isOnline": true,
-  "mapName": "Bermuda",
-  "entryFee": 50,
-  "prizePool": 1000,
-  "description": "Join the ultimate Free Fire battle royale tournament!",
-  "rules": "Standard BR rules apply. No teaming, no exploits."
+  "bracket_format": "battle_royale",
+  "team_size": 4,
+  "max_teams": 12,
+  "map_name": "Bermuda",
+  "entry_fee": 50,
+  "prize_pool": 1000,
+  "is_online": true,
+  "venue": null,
+  "registration_start_date": "2026-01-15T10:00:00Z",
+  "registration_end_date": "2026-01-15T18:00:00Z",
+  "tournament_start_date": "2026-01-15T19:00:00Z",
+  "tournament_end_date": "2026-01-15T22:00:00Z",
+  "description": "Join the ultimate Free Fire squad battle!",
+  "rules": "Standard BR rules apply..."
 }
 ```
 
-### Free Fire Clash Squad 4v4
+### Free Fire Clash Squad (4v4)
 
 ```json
 {
-  "name": "Free Fire Clash Squad 4v4",
+  "name": "Clash Squad Championship",
   "game": "freefire",
   "mode": "clash_squad",
-  "teamSize": 4,
-  "maxTeams": 2,
-  "registrationFields": {
-    "requireTeamName": true,
-    "requirePlayerNames": true,
-    "requireGameIds": true
-  },
-  "registrationStartDate": "2026-01-12T10:00:00.000Z",
-  "registrationEndDate": "2026-01-12T14:00:00.000Z",
-  "tournamentStartDate": "2026-01-12T14:30:00.000Z",
-  "tournamentEndDate": "2026-01-12T15:30:00.000Z",
-  "isOnline": true,
-  "mapName": "Bermuda",
-  "entryFee": 25,
-  "prizePool": 500
+  "bracket_format": "single_elimination",
+  "team_size": 4,
+  "max_teams": 2,
+  "map_name": "Bermuda",
+  "entry_fee": 0,
+  "prize_pool": 500,
+  "is_online": true,
+  "venue": null,
+  "registration_start_date": "2026-01-20T14:00:00Z",
+  "registration_end_date": "2026-01-20T17:00:00Z",
+  "tournament_start_date": "2026-01-20T18:00:00Z",
+  "tournament_end_date": "2026-01-20T20:00:00Z",
+  "description": "4v4 tactical showdown!",
+  "rules": "Best of 7 rounds..."
 }
 ```
 
-### BGMI BR 4v4
+### BGMI Battle Royale (Duo)
 
 ```json
 {
-  "name": "BGMI BR Showdown",
+  "name": "BGMI Duo Showdown",
   "game": "bgmi",
   "mode": "br",
-  "teamSize": 4,
-  "maxTeams": 2,
-  "registrationFields": {
-    "requireTeamName": true,
-    "requirePlayerNames": true,
-    "requireGameIds": true
-  },
-  "registrationStartDate": "2026-01-12T10:00:00.000Z",
-  "registrationEndDate": "2026-01-12T14:00:00.000Z",
-  "tournamentStartDate": "2026-01-12T14:30:00.000Z",
-  "tournamentEndDate": "2026-01-12T16:30:00.000Z",
-  "isOnline": true,
-  "mapName": "Erangel",
-  "entryFee": 100,
-  "prizePool": 2000
+  "bracket_format": "battle_royale",
+  "team_size": 2,
+  "max_teams": 50,
+  "map_name": "Erangel",
+  "entry_fee": 100,
+  "prize_pool": 5000,
+  "is_online": true,
+  "venue": null,
+  "registration_start_date": "2026-01-25T08:00:00Z",
+  "registration_end_date": "2026-01-25T16:00:00Z",
+  "tournament_start_date": "2026-01-25T17:00:00Z",
+  "tournament_end_date": "2026-01-25T21:00:00Z",
+  "description": "50 Duo teams battle for glory!",
+  "rules": "Map: Erangel (TPP)..."
 }
 ```
 
-### BGMI TDM 2v2
+### BGMI TDM (4v4)
 
 ```json
 {
-  "name": "BGMI TDM Battle",
+  "name": "TDM Arena Battle",
   "game": "bgmi",
   "mode": "tdm",
-  "teamSize": 2,
-  "maxTeams": 2,
-  "registrationFields": {
-    "requireTeamName": true,
-    "requirePlayerNames": true,
-    "requireGameIds": true
-  },
-  "registrationStartDate": "2026-01-12T10:00:00.000Z",
-  "registrationEndDate": "2026-01-12T12:00:00.000Z",
-  "tournamentStartDate": "2026-01-12T12:30:00.000Z",
-  "tournamentEndDate": "2026-01-12T13:30:00.000Z",
-  "isOnline": true,
-  "entryFee": 50,
-  "prizePool": 500
+  "bracket_format": "double_elimination",
+  "team_size": 4,
+  "max_teams": 2,
+  "map_name": "Warehouse",
+  "entry_fee": 25,
+  "prize_pool": 200,
+  "is_online": true,
+  "venue": null,
+  "registration_start_date": "2026-01-30T12:00:00Z",
+  "registration_end_date": "2026-01-30T14:00:00Z",
+  "tournament_start_date": "2026-01-30T15:00:00Z",
+  "tournament_end_date": "2026-01-30T16:30:00Z",
+  "description": "4v4 TDM deathmatch!",
+  "rules": "First team to 40 kills wins..."
 }
 ```
 
 ---
 
-## 🔄 API Endpoint
+## ✅ Implementation Checklist
 
-### Create Tournament
+- [x] Game configuration with modes
+- [x] Team size options per mode
+- [x] Max registrations per team size
+- [x] Location field hiding for Clash Squad
+- [x] Map required validation for BGMI BR
+- [x] Bracket format selection
+- [x] Dynamic form validation
+- [x] Configuration summary display
+- [x] Example API payloads
+- [ ] Backend validation endpoint
+- [ ] Tournament persistence
 
-```http
-POST /api/tournaments
-Content-Type: application/json
-Authorization: Bearer <token>
+---
 
-{
-  // Tournament payload as shown above
-}
-```
+## 📁 Related Files
 
-### Response
-
-```json
-{
-  "success": true,
-  "message": "Tournament created successfully",
-  "data": {
-    "id": "uuid",
-    "name": "Tournament Name",
-    "game": "freefire",
-    "mode": "br_ranked",
-    "teamSize": 4,
-    "maxTeams": 12,
-    "status": "draft"
-  }
-}
-```
-
-### Error Response
-
-```json
-{
-  "success": false,
-  "message": "Invalid team size for selected game and mode",
-  "errors": [
-    {
-      "field": "teamSize",
-      "message": "Invalid team size for BR Ranked. Valid options: Solo, Duo, Squad"
-    }
-  ]
-}
-```
+- `src/lib/game-config.ts` - Game configurations and validation
+- `src/components/tournament-wizard/GameSelectionStep.tsx` - Game/mode selection
+- `src/components/tournament-wizard/BasicInfoStep.tsx` - Details form
+- `src/app/app/admin/create-tournament/page.tsx` - Wizard page

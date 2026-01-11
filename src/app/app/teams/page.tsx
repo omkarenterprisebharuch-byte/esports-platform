@@ -56,6 +56,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [userGameIds, setUserGameIds] = useState<Record<string, string>>({});
   
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -73,6 +74,7 @@ export default function TeamsPage() {
   });
   const [joinForm, setJoinForm] = useState({
     invite_code: "",
+    game_type: "freefire",
     game_uid: "",
     game_name: "",
   });
@@ -97,13 +99,22 @@ export default function TeamsPage() {
     }
   }, []);
 
-  // Fetch current user
+  // Fetch current user and their game IDs
   const fetchCurrentUser = useCallback(async () => {
     try {
       const res = await secureFetch("/api/auth/me");
       const data = await res.json();
       if (data.success) {
         setCurrentUserId(data.data.id);
+        // Store user's game IDs from profile
+        if (data.data.in_game_ids) {
+          setUserGameIds(data.data.in_game_ids);
+          // Auto-fill game_uid if available for default game type
+          const defaultGameId = data.data.in_game_ids["freefire"];
+          if (defaultGameId) {
+            setCreateForm(prev => ({ ...prev, game_uid: defaultGameId }));
+          }
+        }
       }
     } catch (error) {
       console.error("Failed to fetch user:", error);
@@ -114,6 +125,26 @@ export default function TeamsPage() {
     fetchTeams();
     fetchCurrentUser();
   }, [fetchTeams, fetchCurrentUser]);
+
+  // Auto-fill game UID when create modal opens or userGameIds loads
+  useEffect(() => {
+    if (showCreateModal) {
+      const gameId = userGameIds[createForm.game_type];
+      if (gameId && !createForm.game_uid) {
+        setCreateForm(prev => ({ ...prev, game_uid: gameId }));
+      }
+    }
+  }, [showCreateModal, userGameIds, createForm.game_type, createForm.game_uid]);
+
+  // Auto-fill game UID when join modal opens or userGameIds loads
+  useEffect(() => {
+    if (showJoinModal) {
+      const gameId = userGameIds[joinForm.game_type];
+      if (gameId && !joinForm.game_uid) {
+        setJoinForm(prev => ({ ...prev, game_uid: gameId }));
+      }
+    }
+  }, [showJoinModal, userGameIds, joinForm.game_type, joinForm.game_uid]);
 
   // Fetch team members
   const fetchTeamMembers = async (teamId: number) => {
@@ -140,6 +171,42 @@ export default function TeamsPage() {
     }
   };
 
+  // Handle game type change - auto-fill UID from profile if available
+  const handleGameTypeChange = (gameType: string, formType: "create" | "join") => {
+    const savedGameUid = userGameIds[gameType] || "";
+    
+    if (formType === "create") {
+      setCreateForm(prev => ({ 
+        ...prev, 
+        game_type: gameType,
+        game_uid: savedGameUid 
+      }));
+    } else {
+      setJoinForm(prev => ({ 
+        ...prev, 
+        game_type: gameType,
+        game_uid: savedGameUid 
+      }));
+    }
+  };
+
+  // Update user profile with new game UID
+  const updateUserGameId = async (gameType: string, gameUid: string) => {
+    // Only update if the UID is different from what's stored
+    if (userGameIds[gameType] === gameUid) return;
+    
+    try {
+      const updatedGameIds = { ...userGameIds, [gameType]: gameUid };
+      await secureFetch("/api/users/profile", {
+        method: "PUT",
+        body: JSON.stringify({ in_game_ids: updatedGameIds }),
+      });
+      setUserGameIds(updatedGameIds);
+    } catch (error) {
+      console.error("Failed to update game ID in profile:", error);
+    }
+  };
+
   // Create team
   const handleCreateTeam = async () => {
     if (!createForm.team_name || !createForm.game_uid || !createForm.game_name) {
@@ -160,8 +227,10 @@ export default function TeamsPage() {
 
       if (res.ok) {
         setMessage({ type: "success", text: "Team created successfully!" });
+        // Update user profile with the game UID if it's new
+        await updateUserGameId(createForm.game_type, createForm.game_uid);
         setShowCreateModal(false);
-        setCreateForm({ team_name: "", game_type: "freefire", game_uid: "", game_name: "" });
+        setCreateForm({ team_name: "", game_type: "freefire", game_uid: userGameIds["freefire"] || "", game_name: "" });
         fetchTeams();
       } else {
         setMessage({ type: "error", text: data.message || "Failed to create team" });
@@ -193,8 +262,10 @@ export default function TeamsPage() {
 
       if (res.ok) {
         setMessage({ type: "success", text: "Successfully joined team!" });
+        // Update user profile with the game UID if it's new
+        await updateUserGameId(joinForm.game_type, joinForm.game_uid);
         setShowJoinModal(false);
-        setJoinForm({ invite_code: "", game_uid: "", game_name: "" });
+        setJoinForm({ invite_code: "", game_type: "freefire", game_uid: userGameIds["freefire"] || "", game_name: "" });
         fetchTeams();
       } else {
         setMessage({ type: "error", text: data.message || "Failed to join team" });
@@ -427,7 +498,7 @@ export default function TeamsPage() {
           <FormSelect
             label="Game"
             value={createForm.game_type}
-            onChange={(e) => setCreateForm({ ...createForm, game_type: e.target.value })}
+            onChange={(e) => handleGameTypeChange(e.target.value, "create")}
             options={GAME_TYPES}
             required
           />
@@ -435,8 +506,9 @@ export default function TeamsPage() {
             label="Your In-Game UID"
             value={createForm.game_uid}
             onChange={(e) => setCreateForm({ ...createForm, game_uid: e.target.value })}
-            placeholder="Your player ID in the game"
+            placeholder={userGameIds[createForm.game_type] ? "Auto-filled from profile" : "Your player ID in the game"}
             required
+            hint={userGameIds[createForm.game_type] ? "✓ Loaded from your profile" : "Will be saved to your profile"}
           />
           <FormField
             label="Your In-Game Name"
@@ -479,12 +551,19 @@ export default function TeamsPage() {
             placeholder="Enter team invite code"
             required
           />
+          <FormSelect
+            label="Game (to load your saved UID)"
+            value={joinForm.game_type}
+            onChange={(e) => handleGameTypeChange(e.target.value, "join")}
+            options={GAME_TYPES}
+          />
           <FormField
             label="Your In-Game UID"
             value={joinForm.game_uid}
             onChange={(e) => setJoinForm({ ...joinForm, game_uid: e.target.value })}
-            placeholder="Your player ID in the game"
+            placeholder={userGameIds[joinForm.game_type] ? "Auto-filled from profile" : "Your player ID in the game"}
             required
+            hint={userGameIds[joinForm.game_type] ? "✓ Loaded from your profile" : "Will be saved to your profile"}
           />
           <FormField
             label="Your In-Game Name"

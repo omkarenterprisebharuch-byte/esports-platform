@@ -1,30 +1,26 @@
 import { NextRequest } from "next/server";
 import pool from "@/lib/db";
 import { successResponse, errorResponse, unauthorizedResponse } from "@/lib/api-response";
-import { verifyToken } from "@/lib/auth";
+import { getUserFromRequest } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   const { teamId } = await params;
-  const token = request.headers.get("authorization")?.replace("Bearer ", "");
-
-  if (!token) {
-    return unauthorizedResponse("No token provided");
+  
+  // Get user from httpOnly cookie or Authorization header
+  const user = getUserFromRequest(request);
+  if (!user) {
+    return unauthorizedResponse("Authentication required");
   }
 
-  const decoded = verifyToken(token);
-  if (!decoded) {
-    return unauthorizedResponse("Invalid token");
-  }
-
-  const userId = decoded.id;
+  const userId = user.id;
 
   try {
     // Check if user is member of this team
     const memberResult = await pool.query(
-      `SELECT tm.*, t.owner_id 
+      `SELECT tm.*, t.captain_id 
        FROM team_members tm
        JOIN teams t ON tm.team_id = t.id
        WHERE tm.team_id = $1 AND tm.user_id = $2`,
@@ -37,10 +33,10 @@ export async function POST(
 
     const member = memberResult.rows[0];
 
-    // Check if user is the owner
-    if (member.owner_id === userId) {
+    // Check if user is the captain
+    if (member.captain_id === userId) {
       return errorResponse(
-        "Team owner cannot leave. Delete the team instead.",
+        "Team captain cannot leave. Delete the team or transfer ownership first.",
         400
       );
     }

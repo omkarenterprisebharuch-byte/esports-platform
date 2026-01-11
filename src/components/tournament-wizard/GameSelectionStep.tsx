@@ -168,13 +168,24 @@ export default function GameSelectionStep({
                   ))}
                 </div>
 
-                {mode.maxTeams <= 2 && !mode.isPlaceholder && (
-                  <div className="mt-2">
+                {/* Mode-specific badges */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {mode.maxTeams === 2 && !mode.isPlaceholder && (
                     <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                      ⚠️ Always 2 teams only
+                      ⚠️ Always 2 teams
                     </span>
-                  </div>
-                )}
+                  )}
+                  {mode.hideLocation && (
+                    <span className="text-xs text-blue-600 dark:text-blue-400">
+                      🌐 Online only
+                    </span>
+                  )}
+                  {mode.requiresMap && (
+                    <span className="text-xs text-green-600 dark:text-green-400">
+                      🗺️ Map required
+                    </span>
+                  )}
+                </div>
               </button>
             ))}
           </div>
@@ -187,10 +198,13 @@ export default function GameSelectionStep({
           <span className="text-blue-500 text-xl">💡</span>
           <div>
             <p className="text-sm text-blue-800 dark:text-blue-300">
-              <strong>Game Rules:</strong> Each game has specific modes and team size constraints. 
-              For example, BGMI tournaments always have 2 teams, while Free Fire BR Ranked supports 
-              full lobbies with up to 48 players in Solo mode.
+              <strong>Game Rules:</strong> Each game has specific modes and constraints:
             </p>
+            <ul className="text-sm text-blue-700 dark:text-blue-400 mt-2 space-y-1 list-disc list-inside">
+              <li><strong>Free Fire Clash Squad:</strong> Always 2 teams, no location field</li>
+              <li><strong>BGMI BR:</strong> Solo (100p), Duo (50t), Squad (25t) - Map required</li>
+              <li><strong>BGMI TDM:</strong> Always 2 teams</li>
+            </ul>
           </div>
         </div>
       </div>

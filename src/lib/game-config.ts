@@ -5,18 +5,26 @@
  * for the tournament creation wizard.
  * 
  * 🎮 Supported Games:
- * - Free Fire: BR Ranked (Solo/Duo/Squad), Clash Squad (1v1, 2v2, 3v3, 4v4)
- * - BGMI: BR (1v1, 2v2, 3v3, 4v4), TDM (1v1, 2v2, 3v3, 4v4)
+ * - Free Fire: BR Ranked (Solo/Duo/Squad), Clash Squad (1v1-4v4, 2 teams only, no location)
+ * - BGMI: Battle Royale (Solo:100p/Duo:50t/Squad:25t, maps required), TDM (1v1-4v4, 2 teams)
  * - Valorant: Placeholder (5v5)
  * - CODM: Placeholder (BR/Multiplayer)
+ * 
+ * 📋 Strict Rules:
+ * - Free Fire Clash Squad: NO location field, always 2 teams
+ * - BGMI BR: Maps REQUIRED, registration caps vary by team size
+ * - BGMI TDM: Always 2 teams
  */
 
 // ============ Type Definitions ============
+
+export type BracketFormat = 'single_elimination' | 'double_elimination' | 'round_robin' | 'swiss' | 'battle_royale';
 
 export interface TeamSizeOption {
   value: number;
   label: string;
   description: string;
+  maxRegistrations: number; // Max teams or players for this team size
 }
 
 export interface GameMode {
@@ -26,6 +34,9 @@ export interface GameMode {
   maxTeams: number;
   teamSizes: TeamSizeOption[];
   isPlaceholder?: boolean;
+  hideLocation?: boolean;       // Hide location field (e.g., Clash Squad)
+  requiresMap?: boolean;        // Map selection required (e.g., BGMI BR)
+  supportedFormats: BracketFormat[];
 }
 
 export interface GameConfig {
@@ -43,13 +54,24 @@ export interface GameConfig {
   registrationWindowHours: number;
 }
 
+// ============ Bracket Format Options ============
+
+export const BRACKET_FORMATS: Record<BracketFormat, { label: string; description: string }> = {
+  single_elimination: { label: "Single Elimination", description: "Lose once and you're out" },
+  double_elimination: { label: "Double Elimination", description: "Lose twice to be eliminated" },
+  round_robin: { label: "Round Robin", description: "Everyone plays everyone" },
+  swiss: { label: "Swiss System", description: "Matched by performance" },
+  battle_royale: { label: "Battle Royale", description: "Last team standing wins" },
+};
+
 // ============ Team Size Options ============
 
+// Standard team vs team options (for Clash Squad, TDM)
 const STANDARD_TEAM_SIZES: TeamSizeOption[] = [
-  { value: 1, label: "1v1", description: "Single player vs single player" },
-  { value: 2, label: "2v2", description: "2 players per team" },
-  { value: 3, label: "3v3", description: "3 players per team" },
-  { value: 4, label: "4v4", description: "4 players per team" },
+  { value: 1, label: "1v1", description: "Single player vs single player", maxRegistrations: 2 },
+  { value: 2, label: "2v2", description: "2 players per team", maxRegistrations: 2 },
+  { value: 3, label: "3v3", description: "3 players per team", maxRegistrations: 2 },
+  { value: 4, label: "4v4", description: "4 players per team", maxRegistrations: 2 },
 ];
 
 // ============ Game Configurations ============
@@ -64,19 +86,22 @@ export const GAME_CONFIGS: Record<string, GameConfig> = {
         id: "br_ranked",
         name: "BR Ranked",
         description: "Classic Battle Royale mode",
-        maxTeams: 12, // For squad, adjusts based on team size
+        maxTeams: 48,
         teamSizes: [
-          { value: 1, label: "Solo", description: "48 players battle royale" },
-          { value: 2, label: "Duo", description: "24 teams of 2 players" },
-          { value: 4, label: "Squad", description: "12 squads of 4 players" },
+          { value: 1, label: "Solo", description: "48 players free-for-all", maxRegistrations: 48 },
+          { value: 2, label: "Duo", description: "24 teams of 2 players", maxRegistrations: 24 },
+          { value: 4, label: "Squad", description: "12 squads of 4 players", maxRegistrations: 12 },
         ],
+        supportedFormats: ['battle_royale', 'round_robin'],
       },
       {
         id: "clash_squad",
         name: "Clash Squad",
-        description: "4v4 tactical team mode - Only 2 teams allowed",
-        maxTeams: 2, // Always 2 teams in Clash Squad
+        description: "Tactical 4v4 mode - Always 2 teams",
+        maxTeams: 2, // STRICT: Always 2 teams
         teamSizes: STANDARD_TEAM_SIZES,
+        hideLocation: true, // NO location field for Clash Squad
+        supportedFormats: ['single_elimination', 'double_elimination', 'round_robin'],
       },
     ],
     maps: ["Bermuda", "Purgatory", "Kalahari", "Nextera", "Alpine"],
@@ -122,16 +147,23 @@ export const GAME_CONFIGS: Record<string, GameConfig> = {
       {
         id: "br",
         name: "Battle Royale",
-        description: "Classic BR mode - Always 2 teams",
-        maxTeams: 2, // Always 2 teams in BGMI
-        teamSizes: STANDARD_TEAM_SIZES,
+        description: "Classic BR - Maps required",
+        maxTeams: 100, // Solo cap, varies by team size
+        teamSizes: [
+          { value: 1, label: "Solo", description: "100 players (individual)", maxRegistrations: 100 },
+          { value: 2, label: "Duo", description: "50 teams (2 players each)", maxRegistrations: 50 },
+          { value: 4, label: "Squad", description: "25 teams (4 players each)", maxRegistrations: 25 },
+        ],
+        requiresMap: true, // Map selection is REQUIRED
+        supportedFormats: ['battle_royale', 'round_robin'],
       },
       {
         id: "tdm",
         name: "TDM",
-        description: "Team Deathmatch mode - Always 2 teams",
-        maxTeams: 2, // Always 2 teams in TDM
+        description: "Team Deathmatch - Always 2 teams",
+        maxTeams: 2, // STRICT: Always 2 teams
         teamSizes: STANDARD_TEAM_SIZES,
+        supportedFormats: ['single_elimination', 'double_elimination', 'round_robin'],
       },
     ],
     maps: ["Erangel", "Miramar", "Sanhok", "Vikendi", "Livik", "Karakin"],
@@ -176,9 +208,10 @@ export const GAME_CONFIGS: Record<string, GameConfig> = {
         description: "Standard competitive mode (Coming Soon)",
         maxTeams: 16,
         teamSizes: [
-          { value: 5, label: "5v5", description: "Standard 5v5 competitive" },
+          { value: 5, label: "5v5", description: "Standard 5v5 competitive", maxRegistrations: 16 },
         ],
         isPlaceholder: true,
+        supportedFormats: ['single_elimination', 'double_elimination', 'swiss'],
       },
     ],
     maps: ["Ascent", "Bind", "Haven", "Split", "Icebox", "Breeze", "Fracture", "Pearl", "Lotus", "Sunset"],
@@ -212,13 +245,14 @@ Coming soon - Valorant tournament support will be added in a future update.
         id: "br",
         name: "Battle Royale",
         description: "Classic BR mode (Coming Soon)",
-        maxTeams: 25,
+        maxTeams: 100,
         teamSizes: [
-          { value: 1, label: "Solo", description: "100 players BR" },
-          { value: 2, label: "Duo", description: "50 teams of 2" },
-          { value: 4, label: "Squad", description: "25 squads of 4" },
+          { value: 1, label: "Solo", description: "100 players BR", maxRegistrations: 100 },
+          { value: 2, label: "Duo", description: "50 teams of 2", maxRegistrations: 50 },
+          { value: 4, label: "Squad", description: "25 squads of 4", maxRegistrations: 25 },
         ],
         isPlaceholder: true,
+        supportedFormats: ['battle_royale', 'round_robin'],
       },
       {
         id: "multiplayer",
@@ -226,9 +260,10 @@ Coming soon - Valorant tournament support will be added in a future update.
         description: "5v5 multiplayer modes (Coming Soon)",
         maxTeams: 2,
         teamSizes: [
-          { value: 5, label: "5v5", description: "Standard multiplayer" },
+          { value: 5, label: "5v5", description: "Standard multiplayer", maxRegistrations: 2 },
         ],
         isPlaceholder: true,
+        supportedFormats: ['single_elimination', 'double_elimination'],
       },
     ],
     maps: ["Isolated", "Blackout", "Alcatraz"],
@@ -278,22 +313,37 @@ export function getMaxTeams(gameId: string, modeId: string, teamSize: number): n
   const mode = getGameMode(gameId, modeId);
   if (!mode) return 2;
 
-  // For Free Fire BR Ranked, max teams depends on team size
-  if (gameId === "freefire" && modeId === "br_ranked") {
-    switch (teamSize) {
-      case 1: return 48; // Solo
-      case 2: return 24; // Duo
-      case 4: return 12; // Squad
-      default: return 12;
-    }
-  }
-
-  // For BGMI and Clash Squad, always 2 teams
-  if (gameId === "bgmi" || modeId === "clash_squad") {
-    return 2;
+  // Find the team size option to get maxRegistrations
+  const teamSizeOption = mode.teamSizes.find(ts => ts.value === teamSize);
+  if (teamSizeOption) {
+    return teamSizeOption.maxRegistrations;
   }
 
   return mode.maxTeams;
+}
+
+/**
+ * Check if location field should be hidden for this mode
+ */
+export function shouldHideLocation(gameId: string, modeId: string): boolean {
+  const mode = getGameMode(gameId, modeId);
+  return mode?.hideLocation === true;
+}
+
+/**
+ * Check if map selection is required for this mode
+ */
+export function isMapRequired(gameId: string, modeId: string): boolean {
+  const mode = getGameMode(gameId, modeId);
+  return mode?.requiresMap === true;
+}
+
+/**
+ * Get supported bracket formats for a mode
+ */
+export function getSupportedFormats(gameId: string, modeId: string): BracketFormat[] {
+  const mode = getGameMode(gameId, modeId);
+  return mode?.supportedFormats || ['single_elimination'];
 }
 
 export function isValidCombination(gameId: string, modeId: string, teamSize: number): boolean {
@@ -306,7 +356,8 @@ export function validateTournamentConfig(
   gameId: string,
   modeId: string,
   teamSize: number,
-  maxTeams: number
+  maxTeams: number,
+  mapName?: string
 ): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   
@@ -334,11 +385,17 @@ export function validateTournamentConfig(
 
   const allowedMaxTeams = getMaxTeams(gameId, modeId, teamSize);
   if (maxTeams > allowedMaxTeams) {
-    errors.push(`Max teams cannot exceed ${allowedMaxTeams} for ${mode.name} ${teamSize}v${teamSize}`);
+    const sizeLabel = mode.teamSizes.find(ts => ts.value === teamSize)?.label || `${teamSize}v${teamSize}`;
+    errors.push(`Max registrations cannot exceed ${allowedMaxTeams} for ${mode.name} ${sizeLabel}`);
   }
 
   if (maxTeams < 2) {
     errors.push("Must have at least 2 teams/players");
+  }
+
+  // Check if map is required but not provided
+  if (mode.requiresMap && !mapName) {
+    errors.push(`Map selection is required for ${mode.name}`);
   }
 
   return { valid: errors.length === 0, errors };
