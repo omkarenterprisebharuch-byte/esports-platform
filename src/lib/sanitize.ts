@@ -286,13 +286,15 @@ export function sanitizeDescription(description: string): string {
 }
 
 /**
- * Sanitize game UID (alphanumeric + some special chars)
+ * Sanitize game UID (numeric only - no alphabetic characters allowed)
+ * Game IDs must contain only digits (0-9)
  */
 export function sanitizeGameUid(uid: string): string {
   if (!uid || typeof uid !== "string") return "";
   
+  // Remove all non-numeric characters and limit to 50 chars
   return uid
-    .replace(/[^a-zA-Z0-9#_-]/g, "")
+    .replace(/[^0-9]/g, "")
     .substring(0, 50)
     .trim();
 }

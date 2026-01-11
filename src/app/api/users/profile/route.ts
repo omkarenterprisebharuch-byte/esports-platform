@@ -13,9 +13,18 @@ import { sanitizeUsername, sanitizeText, sanitizeUrl, sanitizeGameUid } from "@/
 import { 
   encryptPhoneNumber, 
   encryptInGameIds, 
-  decryptUserPII 
+  decryptUserPII,
+  hashPhoneNumber,
+  hashGameId 
 } from "@/lib/encryption";
 import { invalidateDbCache } from "@/lib/db-cache";
+
+// Type for PostgreSQL errors with code
+interface PostgresError extends Error {
+  code?: string;
+  constraint?: string;
+  detail?: string;
+}
 
 // Schema for updating profile
 const updateProfileSchema = z.object({
@@ -35,7 +44,11 @@ const updateProfileSchema = z.object({
     .regex(/^[\d\s\-+()]*$/, "Invalid phone number format")
     .optional()
     .or(z.literal("")),
-  in_game_ids: z.record(z.string().max(50)).optional(),
+  in_game_ids: z.record(
+    z.string()
+      .max(50, "Game ID must be less than 50 characters")
+      .regex(/^\d*$/, "Game ID must contain only numbers")
+  ).optional(),
   avatar_url: z
     .string()
     .url("Invalid avatar URL")
@@ -158,33 +171,40 @@ export async function PUT(request: NextRequest) {
     if (phone_number !== undefined) {
       // Check if phone number is taken by another user (only if not empty)
       if (phone_number && phone_number.trim() !== "") {
-        // Encrypt the phone number to compare with stored encrypted values
-        const encryptedPhoneToCheck = encryptPhoneNumber(phone_number);
+        // Use hash for uniqueness check (encrypted values can't be compared directly)
+        const phoneHash = hashPhoneNumber(phone_number);
         const existingPhone = await pool.query(
-          "SELECT id FROM users WHERE phone_number = $1 AND id != $2",
-          [encryptedPhoneToCheck, user.id]
+          "SELECT id FROM users WHERE phone_number_hash = $1 AND id != $2",
+          [phoneHash, user.id]
         );
         if (existingPhone.rows.length > 0) {
-          return errorResponse("Phone number is already in use by another account");
+          return errorResponse("USER_2007");
         }
       }
       // Encrypt phone number before storing
-      const encryptedPhone = encryptPhoneNumber(phone_number);
+      const encryptedPhone = phone_number.trim() !== "" ? encryptPhoneNumber(phone_number) : null;
+      const phoneHash = phone_number.trim() !== "" ? hashPhoneNumber(phone_number) : null;
+      
       updates.push(`phone_number = $${paramIndex}`);
       values.push(encryptedPhone);
+      paramIndex++;
+      
+      updates.push(`phone_number_hash = $${paramIndex}`);
+      values.push(phoneHash);
       paramIndex++;
     }
 
     if (sanitizedInGameIds !== undefined) {
-      // Check if any in-game ID is already in use by another user
+      // Check if any in-game ID is already in use by another user (using hashes)
       if (sanitizedInGameIds && Object.keys(sanitizedInGameIds).length > 0) {
         for (const [gameKey, gameId] of Object.entries(sanitizedInGameIds)) {
           if (gameId && gameId.trim() !== "") {
-            // Check if this specific game ID is used by another user
+            // Use hash for uniqueness check (encrypted values can't be compared directly)
+            const gameIdHash = hashGameId(gameKey, gameId);
             const existingGameId = await pool.query(
-              `SELECT id FROM users 
-               WHERE in_game_ids->>$1 = $2 AND id != $3`,
-              [gameKey, gameId, user.id]
+              `SELECT user_id FROM user_game_id_hashes 
+               WHERE game_type = $1 AND game_id_hash = $2 AND user_id != $3`,
+              [gameKey, gameIdHash, user.id]
             );
             if (existingGameId.rows.length > 0) {
               return errorResponse(`The ${gameKey} ID "${gameId}" is already in use by another player`);
@@ -192,6 +212,29 @@ export async function PUT(request: NextRequest) {
           }
         }
       }
+      
+      // Update game ID hashes in the tracking table
+      // First, remove old hashes for this user
+      await pool.query(
+        `DELETE FROM user_game_id_hashes WHERE user_id = $1`,
+        [user.id]
+      );
+      
+      // Insert new hashes
+      if (sanitizedInGameIds && Object.keys(sanitizedInGameIds).length > 0) {
+        for (const [gameKey, gameId] of Object.entries(sanitizedInGameIds)) {
+          if (gameId && gameId.trim() !== "") {
+            const gameIdHash = hashGameId(gameKey, gameId);
+            await pool.query(
+              `INSERT INTO user_game_id_hashes (user_id, game_type, game_id_hash)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (game_type, game_id_hash) DO NOTHING`,
+              [user.id, gameKey, gameIdHash]
+            );
+          }
+        }
+      }
+      
       // Encrypt in-game IDs before storing
       const encryptedGameIds = encryptInGameIds(sanitizedInGameIds);
       updates.push(`in_game_ids = $${paramIndex}`);
@@ -231,6 +274,35 @@ export async function PUT(request: NextRequest) {
     );
   } catch (error) {
     console.error("Update profile error:", error);
+    
+    // Handle PostgreSQL unique constraint violations
+    const pgError = error as PostgresError;
+    if (pgError.code === "23505") { // unique_violation
+      const detail = pgError.detail || "";
+      const constraint = pgError.constraint || "";
+      
+      // Check which field caused the violation
+      if (constraint.includes("username") || detail.toLowerCase().includes("username")) {
+        return errorResponse("USER_2003");
+      }
+      if (constraint.includes("email") || detail.toLowerCase().includes("email")) {
+        return errorResponse("USER_2002");
+      }
+      if (constraint.includes("phone") || detail.toLowerCase().includes("phone")) {
+        return errorResponse("USER_2007");
+      }
+      if (constraint.includes("game_id") || detail.toLowerCase().includes("game_id") || detail.toLowerCase().includes("game id")) {
+        return errorResponse("USER_2008");
+      }
+      // Generic unique violation
+      return errorResponse("This value is already in use by another account", 409);
+    }
+    
+    // Handle custom trigger error for game_id uniqueness
+    if (pgError.message && pgError.message.includes("already in use by another user")) {
+      return errorResponse("USER_2008");
+    }
+    
     return serverErrorResponse(error);
   }
 }

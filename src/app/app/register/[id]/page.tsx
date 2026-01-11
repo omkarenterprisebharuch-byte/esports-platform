@@ -183,14 +183,17 @@ export default function TeamRegistrationPage() {
     setMessage(null);
 
     try {
+      // Prepare payload: team_id is a number, selected_players are UUID strings
+      const payload = {
+        tournament_id: tournamentId,
+        team_id: selectedTeam.id, // Keep as number - teams use integer IDs
+        selected_players: selectedPlayers.map(id => String(id)), // User IDs are UUIDs
+      };
+      
       const res = await secureFetch("/api/registrations/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tournament_id: tournamentId,
-          team_id: selectedTeam.id,
-          selected_players: selectedPlayers,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();

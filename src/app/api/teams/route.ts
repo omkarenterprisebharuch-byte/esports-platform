@@ -32,10 +32,22 @@ const createTeamSchema = z.object({
 });
 
 /**
- * Generate a unique 5-digit team invite code
+ * Generate a unique 5-digit team code
  */
 function generateTeamCode(): string {
   return Math.floor(10000 + Math.random() * 90000).toString();
+}
+
+/**
+ * Generate a unique invite code (alphanumeric, 8 characters)
+ */
+function generateInviteCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
 }
 
 /**
@@ -132,12 +144,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Generate unique invite code
+      let inviteCode: string;
+      let inviteCodeUnique = false;
+
+      while (!inviteCodeUnique) {
+        inviteCode = generateInviteCode();
+        const existing = await client.query(
+          "SELECT id FROM teams WHERE invite_code = $1",
+          [inviteCode]
+        );
+        if (existing.rows.length === 0) {
+          inviteCodeUnique = true;
+        }
+      }
+
       // Create team
       const teamResult = await client.query(
-        `INSERT INTO teams (team_name, team_code, captain_id, total_members, max_members)
-         VALUES ($1, $2, $3, 1, 6)
-         RETURNING id, team_name, team_code, captain_id, total_members, max_members, created_at`,
-        [sanitizedTeamName, teamCode!, user.id]
+        `INSERT INTO teams (team_name, team_code, invite_code, captain_id, total_members, max_members)
+         VALUES ($1, $2, $3, $4, 1, 6)
+         RETURNING id, team_name, team_code, invite_code, captain_id, total_members, max_members, created_at`,
+        [sanitizedTeamName, teamCode!, inviteCode!, user.id]
       );
 
       const team = teamResult.rows[0];
@@ -160,10 +187,7 @@ export async function POST(request: NextRequest) {
 
     return successResponse(
       {
-        team: {
-          ...result,
-          invite_code: result.team_code,
-        },
+        team: result,
       },
       "Team created successfully",
       201

@@ -191,21 +191,22 @@ export default function AppHomePage() {
             Browse by Game
           </h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory -mx-4 px-4 md:mx-0 md:px-0 pl-4 md:pl-0">
           {FEATURED_GAMES.map((game) => (
             <Link
               key={game.key}
               href={`/app/tournaments?game=${game.key}`}
               className={`
-                relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br ${game.color}
+                relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br ${game.color}
                 group hover:scale-[1.02] hover:shadow-lg transition-all duration-200
+                flex-shrink-0 w-[calc(33.333%-8px)] min-w-[110px] snap-start
               `}
             >
-              <span className="text-3xl md:text-4xl">{game.icon}</span>
-              <h3 className="text-lg font-bold text-white mt-2">{game.name}</h3>
+              <span className="text-2xl md:text-4xl">{game.icon}</span>
+              <h3 className="text-sm md:text-lg font-bold text-white mt-1 md:mt-2 truncate">{game.name}</h3>
               {topGame?.game === game.key && (
-                <div className="absolute top-3 right-3 bg-white/20 backdrop-blur rounded-full px-2 py-1 text-xs text-white font-medium">
-                  ⭐ Favorite
+                <div className="absolute top-2 right-2 bg-white/20 backdrop-blur rounded-full px-1.5 py-0.5 text-[10px] md:text-xs text-white font-medium">
+                  ⭐
                 </div>
               )}
             </Link>

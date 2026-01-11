@@ -152,6 +152,18 @@ USER_2006 - "Failed to upload profile picture"
            Solution: Check Cloudinary credentials, file size
            HTTP: 400
 
+USER_2007 - "This phone number is already registered to another account"
+           Internal: Duplicate phone_number constraint violation
+           Cause: Phone number already exists in database
+           Solution: Use different phone number or recover existing account
+           HTTP: 409
+
+USER_2008 - "This game ID is already in use by another player"
+           Internal: Duplicate game_id constraint violation
+           Cause: Game ID (e.g., PUBG ID, Free Fire ID) is registered to another user
+           Solution: Use different game ID or contact support if this is your account
+           HTTP: 409
+
 
 --------------------------------------------------------------------------------
                       TOURNAMENT ERRORS (TOUR_3xxx)

@@ -19,7 +19,7 @@ import { invalidateDbCache } from "@/lib/db-cache";
 // Schema for tournament registration
 const registerTournamentSchema = z.object({
   tournament_id: uuidSchema,
-  team_id: uuidSchema.optional().nullable(),
+  team_id: z.union([z.number(), z.string().transform(Number)]).optional().nullable(), // Team IDs are integers in the database
   selected_players: z.array(uuidSchema).optional().nullable(),
   backup_players: z.array(uuidSchema).optional().nullable(),
   join_waitlist: z.boolean().optional().default(false),
@@ -311,7 +311,7 @@ export async function POST(request: NextRequest) {
         // Check selected players for bans - inline query using transaction client
         const playerIds = selected_players || [user.id];
         const playersResult = await client.query(
-          `SELECT u.id, u.username, u.in_game_ids FROM users u WHERE u.id = ANY($1::int[])`,
+          `SELECT u.id, u.username, u.in_game_ids FROM users u WHERE u.id = ANY($1::uuid[])`,
           [playerIds]
         );
 

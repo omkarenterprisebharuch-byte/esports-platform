@@ -178,6 +178,20 @@ export const ERROR_CODES: Record<string, ErrorCodeInfo> = {
     internalMessage: "Cloudinary upload failed",
     category: "User",
   },
+  USER_2007: {
+    code: "USER_2007",
+    httpStatus: 409,
+    userMessage: "This phone number is already registered to another account",
+    internalMessage: "Duplicate phone_number constraint violation",
+    category: "User",
+  },
+  USER_2008: {
+    code: "USER_2008",
+    httpStatus: 409,
+    userMessage: "This game ID is already in use by another player",
+    internalMessage: "Duplicate game_id constraint violation",
+    category: "User",
+  },
 
   // ============ TOURNAMENT ERRORS (3xxx) ============
   TOUR_3001: {

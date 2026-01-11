@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         t.id,
         t.team_name,
         t.team_code,
+        t.invite_code,
         t.total_members,
         t.max_members,
         t.created_at,

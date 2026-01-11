@@ -1,5 +1,7 @@
 "use client";
 
+console.log("[ChatContext] Module initialized");
+
 import React, {
   createContext,
   useContext,
@@ -51,6 +53,8 @@ interface LastRoomInfo {
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
+  console.log("[ChatProvider] Component rendering - children:", !!children);
+  
   const [isConnected, setIsConnected] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeUserCount, setActiveUserCount] = useState(0);

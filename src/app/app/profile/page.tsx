@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { secureFetch } from "@/lib/api-client";
+import { useRouter } from "next/navigation";
+import { secureFetch, logout } from "@/lib/api-client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { TabNav } from "@/components/app/TabNav";
 import { FormField } from "@/components/app/FormComponents";
@@ -38,8 +39,10 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const router = useRouter();
   
   const [form, setForm] = useState({
     username: "",
@@ -215,6 +218,28 @@ export default function ProfilePage() {
           </button>
         </div>
       </form>
+
+      {/* Sign Out Button - Mobile friendly placement */}
+      <div className="mt-8 mb-24 md:mb-8">
+        <button
+          onClick={async () => {
+            setSigningOut(true);
+            try {
+              await logout();
+              router.push("/login");
+            } catch {
+              setSigningOut(false);
+            }
+          }}
+          disabled={signingOut}
+          className="w-full px-6 py-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-semibold rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          {signingOut ? "Signing Out..." : "Sign Out"}
+        </button>
+      </div>
     </div>
   );
 }

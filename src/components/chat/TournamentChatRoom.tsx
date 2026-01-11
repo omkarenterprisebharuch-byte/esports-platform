@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect, useCallback, memo } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { ChatMessage } from "@/lib/socket-client";
 
+console.log("[TournamentChatRoom] Module loaded");
+
 interface TournamentChatRoomProps {
   tournamentId: number | string;
   tournamentName: string;

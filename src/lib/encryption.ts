@@ -383,3 +383,54 @@ export function reEncrypt(plaintext: string): string {
 export function clearKeyCache(): void {
   encryptionKeyCache = null;
 }
+
+// ============ Hashing for Uniqueness Checks ============
+
+/**
+ * Hash a phone number for uniqueness comparison.
+ * Uses HMAC-SHA256 with the encryption key for a deterministic, secure hash.
+ * This allows checking for duplicates without decrypting all values.
+ * 
+ * @param phoneNumber - Phone number to hash
+ * @returns Base64-encoded hash or null if no phone number
+ */
+export function hashPhoneNumber(phoneNumber: string | null | undefined): string | null {
+  if (!phoneNumber || phoneNumber.trim() === "") {
+    return null;
+  }
+  
+  // Normalize: remove spaces, dashes, and convert to lowercase
+  const normalized = phoneNumber.replace(/[\s\-()]/g, "").toLowerCase();
+  
+  if (!isEncryptionEnabled()) {
+    // Fallback to plain SHA256 if no encryption key (not as secure)
+    return crypto.createHash("sha256").update(normalized).digest("base64");
+  }
+  
+  const key = getEncryptionKey();
+  return crypto.createHmac("sha256", key).update(normalized).digest("base64");
+}
+
+/**
+ * Hash a game ID for uniqueness comparison.
+ * Uses HMAC-SHA256 with the encryption key for a deterministic, secure hash.
+ * 
+ * @param gameType - The game type (e.g., "pubg", "freefire")
+ * @param gameId - The game ID to hash
+ * @returns Base64-encoded hash or null if no game ID
+ */
+export function hashGameId(gameType: string, gameId: string | null | undefined): string | null {
+  if (!gameId || gameId.trim() === "") {
+    return null;
+  }
+  
+  // Combine game type and ID for unique hash per game
+  const combined = `${gameType.toLowerCase()}:${gameId.toLowerCase()}`;
+  
+  if (!isEncryptionEnabled()) {
+    return crypto.createHash("sha256").update(combined).digest("base64");
+  }
+  
+  const key = getEncryptionKey();
+  return crypto.createHmac("sha256", key).update(combined).digest("base64");
+}

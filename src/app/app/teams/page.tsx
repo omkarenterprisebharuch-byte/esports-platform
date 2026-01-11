@@ -318,15 +318,16 @@ export default function TeamsPage() {
                   <span>🆔 {team.team_code}</span>
                 </div>
 
-                {/* Invite Code */}
+                {/* Invite Code with Copy Button */}
                 <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg mb-4">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Invite:</span>
-                  <code className="flex-1 font-mono text-sm text-gray-900 dark:text-white">
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Invite Code:</span>
+                  <code className="flex-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">
                     {team.invite_code}
                   </code>
                   <button
                     onClick={() => copyInviteCode(team.invite_code)}
-                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                    title="Copy invite code"
                   >
                     📋
                   </button>

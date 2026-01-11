@@ -25,11 +25,6 @@ const TournamentChatRoom = dynamic(() => import("@/components/chat/TournamentCha
   ssr: false,
 });
 
-const ChatProvider = dynamic(
-  () => import("@/contexts/ChatContext").then(mod => ({ default: mod.ChatProvider })),
-  { ssr: false }
-);
-
 interface Winners {
   first: string | null;
   second: string | null;
@@ -591,17 +586,15 @@ export default function TournamentDetailsPage() {
 
       {/* Chat Modal */}
       {chatOpen && chatParticipants && currentUserId && tournament && (
-        <ChatProvider>
-          <TournamentChatRoom
-            tournamentId={tournament.id}
-            tournamentName={tournament.tournament_name}
-            currentUserId={currentUserId}
-            registeredUserIds={chatParticipants.registeredUserIds}
-            tournamentEndTime={chatParticipants.tournamentEndDate}
-            isOpen={chatOpen}
-            onClose={() => setChatOpen(false)}
-          />
-        </ChatProvider>
+        <TournamentChatRoom
+          tournamentId={tournament.id}
+          tournamentName={tournament.tournament_name}
+          currentUserId={currentUserId}
+          registeredUserIds={chatParticipants.registeredUserIds}
+          tournamentEndTime={chatParticipants.tournamentEndDate}
+          isOpen={chatOpen}
+          onClose={() => setChatOpen(false)}
+        />
       )}
     </div>
   );

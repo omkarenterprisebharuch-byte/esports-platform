@@ -21,6 +21,13 @@ import {
 } from "@/lib/validations";
 import { recordConsent, PRIVACY_POLICY_VERSION, TERMS_VERSION } from "@/lib/gdpr";
 
+// Type for PostgreSQL errors with code
+interface PostgresError extends Error {
+  code?: string;
+  constraint?: string;
+  detail?: string;
+}
+
 /**
  * POST /api/auth/verify-otp
  * Verify OTP and complete registration
@@ -113,10 +120,21 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Verify OTP error:", error);
 
-    if ((error as { code?: string }).code === "23505") {
-      return errorResponse(
-        "User with this email or username already exists"
-      );
+    // Handle PostgreSQL unique constraint violations
+    const pgError = error as PostgresError;
+    if (pgError.code === "23505") { // unique_violation
+      const detail = pgError.detail || "";
+      const constraint = pgError.constraint || "";
+      
+      // Check which field caused the violation
+      if (constraint.includes("username") || detail.toLowerCase().includes("username")) {
+        return errorResponse("USER_2003");
+      }
+      if (constraint.includes("email") || detail.toLowerCase().includes("email")) {
+        return errorResponse("USER_2002");
+      }
+      // Generic fallback
+      return errorResponse("User with this email or username already exists", 409);
     }
     return serverErrorResponse(error);
   }
