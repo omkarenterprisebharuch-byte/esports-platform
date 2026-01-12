@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { secureFetch } from "@/lib/api-client";
+import { secureFetch, getCachedUser } from "@/lib/api-client";
 import { PageHeader } from "@/components/app/PageHeader";
 import { EmptyState } from "@/components/app/EmptyState";
 import { GameBadge, StatusBadge, RoleBadge } from "@/components/app/Badges";
@@ -29,6 +29,7 @@ interface Team {
   team_name: string;
   team_code: string;
   invite_code: string;
+  game_type: string | null;
   total_members: number;
   max_members: number;
   role: string;
@@ -41,7 +42,7 @@ interface Team {
 
 interface TeamMember {
   id: number;
-  user_id: number;
+  user_id: string;
   role: string;
   game_uid: string;
   game_name: string;
@@ -68,7 +69,8 @@ export default function TeamRegistrationPage() {
   const [eligibleTeams, setEligibleTeams] = useState<Team[]>([]);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [selectedPlayers, setSelectedPlayers] = useState<number[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   // Loading states
   const [loading, setLoading] = useState(true);
@@ -77,6 +79,31 @@ export default function TeamRegistrationPage() {
   
   // Message state
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Helper function to check if two game types match
+  const gameTypesMatch = (tournamentGame: string | undefined, teamGame: string | null | undefined): boolean => {
+    if (!tournamentGame || !teamGame) return false;
+    
+    const normalizedTournament = tournamentGame.toLowerCase().trim();
+    const normalizedTeam = teamGame.toLowerCase().trim();
+    
+    // Direct match
+    if (normalizedTournament === normalizedTeam) return true;
+    
+    // BGMI and PUBG are considered equivalent
+    const bgmiPubgVariants = ["bgmi", "pubg", "pubg mobile", "battlegrounds mobile india"];
+    if (bgmiPubgVariants.includes(normalizedTournament) && bgmiPubgVariants.includes(normalizedTeam)) {
+      return true;
+    }
+    
+    // Free Fire variants
+    const freeFireVariants = ["freefire", "free fire", "ff"];
+    if (freeFireVariants.includes(normalizedTournament) && freeFireVariants.includes(normalizedTeam)) {
+      return true;
+    }
+    
+    return false;
+  };
 
   // Fetch tournament and teams
   const fetchData = useCallback(async () => {
@@ -93,15 +120,23 @@ export default function TeamRegistrationPage() {
         const t = tournamentData.data.tournament;
         setTournament(t);
 
-        // Filter teams that match the tournament's game type
+        // Store all teams
         if (teamsData.success && teamsData.data.teams) {
-          setTeams(teamsData.data.teams);
-          // Match game type (case insensitive)
-          const filtered = teamsData.data.teams.filter((team: Team) => {
-            // Teams don't have game_type directly, but we can infer from game_name
-            // For now, show all teams and let registration API validate
-            return true;
+          const allTeams: Team[] = teamsData.data.teams;
+          setTeams(allTeams);
+          
+          // Filter teams by game type
+          const tournamentGameType = t.game_type;
+          console.log('[GAME FILTER] Tournament game_type:', tournamentGameType);
+          console.log('[GAME FILTER] All teams:', allTeams.map(team => ({ name: team.team_name, game_type: team.game_type })));
+          
+          const filtered = allTeams.filter((team) => {
+            const match = gameTypesMatch(tournamentGameType, team.game_type);
+            console.log(`[GAME FILTER] Team ${team.team_name} (${team.game_type}): ${match ? 'MATCH' : 'NO MATCH'}`);
+            return match;
           });
+          
+          console.log('[GAME FILTER] Filtered teams:', filtered.map(team => team.team_name));
           setEligibleTeams(filtered);
         }
       } else {
@@ -116,6 +151,11 @@ export default function TeamRegistrationPage() {
 
   useEffect(() => {
     fetchData();
+    // Get current user ID from cached user
+    const cachedUser = getCachedUser();
+    if (cachedUser?.id) {
+      setCurrentUserId(null); // Will be set properly when team is selected
+    }
   }, [fetchData]);
 
   // Fetch team members when a team is selected
@@ -125,13 +165,31 @@ export default function TeamRegistrationPage() {
     setMembersLoading(true);
 
     try {
+      // First fetch current user profile to get user_id
+      const userRes = await secureFetch("/api/users/profile");
+      const userData = await userRes.json();
+      let loggedInUserId: string | null = null;
+      
+      if (userData.success && userData.data?.user?.id) {
+        loggedInUserId = userData.data.user.id;
+        setCurrentUserId(loggedInUserId);
+      }
+
       const res = await secureFetch(`/api/teams/${team.id}`);
       const data = await res.json();
 
       if (data.success && data.data.team?.members) {
-        setTeamMembers(data.data.team.members);
-        // Auto-select all members by default
-        setSelectedPlayers(data.data.team.members.map((m: TeamMember) => m.user_id));
+        const members = data.data.team.members;
+        setTeamMembers(members);
+        
+        // Auto-select ONLY the logged-in user (mandatory captain rule)
+        // The logged-in user MUST be selected and cannot be unselected
+        if (loggedInUserId) {
+          const loggedInMember = members.find((m: TeamMember) => m.user_id === loggedInUserId);
+          if (loggedInMember) {
+            setSelectedPlayers([loggedInMember.user_id]);
+          }
+        }
       }
     } catch {
       setMessage({ type: "error", text: "Failed to load team members" });
@@ -141,13 +199,36 @@ export default function TeamRegistrationPage() {
   };
 
   // Toggle player selection
-  const togglePlayer = (userId: number) => {
+  // Rules:
+  // 1. Logged-in user (captain) cannot be unselected - they are mandatory
+  // 2. Cannot select more than required players (2 for Duo, 4 for Squad)
+  const togglePlayer = (userId: string) => {
+    const required = getRequiredPlayers();
+    
     setSelectedPlayers(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
+      // If trying to unselect the logged-in user (captain), prevent it
+      if (prev.includes(userId) && userId === currentUserId) {
+        setMessage({ type: "error", text: "You cannot unselect yourself. The registering player is mandatory." });
+        return prev;
       }
-      return [...prev, userId];
+      
+      if (prev.includes(userId)) {
+        // Unselecting a player (not the captain)
+        return prev.filter(id => id !== userId);
+      } else {
+        // Selecting a new player - check if we've reached the limit
+        if (prev.length >= required.max) {
+          setMessage({ type: "error", text: `You can only select ${required.max} players for this ${tournament?.tournament_type} tournament.` });
+          return prev;
+        }
+        return [...prev, userId];
+      }
     });
+  };
+
+  // Check if a player is the mandatory captain (logged-in user)
+  const isMandatoryCaptain = (userId: string) => {
+    return userId === currentUserId;
   };
 
   // Get required player count based on tournament type
@@ -335,11 +416,12 @@ export default function TeamRegistrationPage() {
           Select Team
         </h3>
 
+        {/* Teams filtered by game type - only show teams that match tournament game */}
         {eligibleTeams.length === 0 ? (
           <EmptyState
             icon="👥"
-            title="No teams available"
-            description="Create a team or join one to register for this tournament"
+            title="No teams available for this game"
+            description="You don't have any teams for this game type. Create a team or join one to register."
             action={{ label: "Create Team", onClick: () => router.push("/app/teams") }}
             secondaryAction={{ label: "My Teams", onClick: () => router.push("/app/teams") }}
             variant="minimal"
@@ -388,6 +470,14 @@ export default function TeamRegistrationPage() {
             </span>
           </h3>
 
+          {/* Selection instructions */}
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-400">
+            <p>
+              <strong>Selection Rules:</strong> Select exactly {required.min === required.max ? required.min : `${required.min}-${required.max}`} players for this {tournament?.tournament_type?.toLowerCase()} match. 
+              You (the registering player) are automatically selected and required to participate.
+            </p>
+          </div>
+
           {membersLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[...Array(4)].map((_, i) => (
@@ -398,42 +488,62 @@ export default function TeamRegistrationPage() {
             <p className="text-gray-500 dark:text-gray-400">No members found in this team</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {teamMembers.map((member) => (
-                <button
-                  key={member.user_id}
-                  onClick={() => togglePlayer(member.user_id)}
-                  className={`
-                    p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3
-                    ${selectedPlayers.includes(member.user_id)
-                      ? "border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-700"
-                      : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                    }
-                  `}
-                >
-                  <div className={`
-                    w-5 h-5 rounded-full border-2 flex items-center justify-center
-                    ${selectedPlayers.includes(member.user_id)
-                      ? "border-gray-900 dark:border-white bg-gray-900 dark:bg-white"
-                      : "border-gray-300 dark:border-gray-600"
-                    }
-                  `}>
-                    {selectedPlayers.includes(member.user_id) && (
-                      <svg className="w-3 h-3 text-white dark:text-gray-900" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                      {member.username}
-                      <RoleBadge role={member.role} />
+              {teamMembers.map((member) => {
+                const isCurrentUser = isMandatoryCaptain(member.user_id);
+                const isSelected = selectedPlayers.includes(member.user_id);
+                
+                return (
+                  <button
+                    key={member.user_id}
+                    onClick={() => togglePlayer(member.user_id)}
+                    className={`
+                      p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3
+                      ${isSelected
+                        ? isCurrentUser
+                          ? "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30" // Locked mandatory captain
+                          : "border-gray-900 dark:border-white bg-gray-50 dark:bg-gray-700"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                      }
+                    `}
+                  >
+                    <div className={`
+                      w-5 h-5 rounded-full border-2 flex items-center justify-center
+                      ${isSelected
+                        ? isCurrentUser
+                          ? "border-green-500 dark:border-green-400 bg-green-500 dark:bg-green-400" // Locked mandatory captain
+                          : "border-gray-900 dark:border-white bg-gray-900 dark:bg-white"
+                        : "border-gray-300 dark:border-gray-600"
+                      }
+                    `}>
+                      {isSelected && (
+                        isCurrentUser ? (
+                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3 h-3 text-white dark:text-gray-900" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )
+                      )}
                     </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {member.game_name} • {member.game_uid}
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                        {member.username}
+                        <RoleBadge role={member.role} />
+                        {isCurrentUser && (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400 rounded-full">
+                            You (Required)
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {member.game_name} • {member.game_uid}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

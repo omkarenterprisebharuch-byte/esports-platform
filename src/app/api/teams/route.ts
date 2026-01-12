@@ -21,6 +21,10 @@ const createTeamSchema = z.object({
     .min(2, "Team name must be at least 2 characters")
     .max(50, "Team name must be less than 50 characters")
     .trim(),
+  game_type: z
+    .enum(["freefire", "pubg", "bgmi", "valorant", "codm"])
+    .optional()
+    .default("freefire"),
   game_uid: z
     .string()
     .min(1, "Game UID is required")
@@ -121,7 +125,7 @@ export async function POST(request: NextRequest) {
       return validationErrorResponse(validation.error, validation.details);
     }
     
-    const { team_name, game_uid, game_name } = validation.data;
+    const { team_name, game_type, game_uid, game_name } = validation.data;
 
     // Sanitize user input to prevent XSS
     const sanitizedTeamName = sanitizeTeamName(team_name);
@@ -161,10 +165,10 @@ export async function POST(request: NextRequest) {
 
       // Create team
       const teamResult = await client.query(
-        `INSERT INTO teams (team_name, team_code, invite_code, captain_id, total_members, max_members)
-         VALUES ($1, $2, $3, $4, 1, 6)
-         RETURNING id, team_name, team_code, invite_code, captain_id, total_members, max_members, created_at`,
-        [sanitizedTeamName, teamCode!, inviteCode!, user.id]
+        `INSERT INTO teams (team_name, team_code, invite_code, captain_id, game_type, total_members, max_members)
+         VALUES ($1, $2, $3, $4, $5, 1, 6)
+         RETURNING id, team_name, team_code, invite_code, captain_id, game_type, total_members, max_members, created_at`,
+        [sanitizedTeamName, teamCode!, inviteCode!, user.id, game_type]
       );
 
       const team = teamResult.rows[0];
