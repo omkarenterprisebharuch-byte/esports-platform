@@ -70,8 +70,10 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* Google AdSense - ownership verification meta tag */}
+        <meta name="google-adsense-account" content="ca-pub-9257204343818316" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        {/* Google AdSense - ownership verification */}
+        {/* Google AdSense - script for ads */}
         <Script
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9257204343818316"
