@@ -93,11 +93,12 @@ const nextConfig: NextConfig = {
     // Content Security Policy - adjust as needed for your CDN/external resources
     const cspHeader = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.js requires unsafe-inline/eval for dev
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com https://www.googletagservices.com https://adservice.google.com https://www.google-analytics.com https://tpc.googlesyndication.com", // Next.js requires unsafe-inline/eval for dev + Google AdSense
       "style-src 'self' 'unsafe-inline'", // Tailwind uses inline styles
-      "img-src 'self' data: blob: https://res.cloudinary.com https://ui-avatars.com",
+      "img-src 'self' data: blob: https://res.cloudinary.com https://ui-avatars.com https://pagead2.googlesyndication.com https://www.google.com https://www.google.co.in https://googleads.g.doubleclick.net",
       "font-src 'self' data:",
-      "connect-src 'self' https://res.cloudinary.com wss: ws:", // WebSocket for Socket.io
+      "connect-src 'self' https://res.cloudinary.com wss: ws: https://pagead2.googlesyndication.com https://www.google-analytics.com", // WebSocket for Socket.io + AdSense
+      "frame-src 'self' https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://www.google.com https://tpc.googlesyndication.com", // Allow AdSense iframes
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
