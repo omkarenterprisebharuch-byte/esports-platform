@@ -36,7 +36,7 @@ export default function ForgotPasswordPage() {
         setError(data.message);
       }
     } catch {
-      setError("Failed to send OTP");
+      setError("Failed to send OTP On Your Email");
     } finally {
       setLoading(false);
     }
