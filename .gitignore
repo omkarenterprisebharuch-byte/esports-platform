@@ -11,10 +11,10 @@ coverage
 out/
 build
 .next
-
+scripts/
 # Production
 dist
-
+.playwright-mcp
 # Misc
 .DS_Store
 *.pem

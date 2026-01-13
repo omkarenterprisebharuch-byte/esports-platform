@@ -16,8 +16,9 @@ export default function Footer() {
           <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
             <Link href="/tournaments" className="text-gray-400 hover:text-orange-500 text-xs">
               Tournaments
-            </Link>
-            <Link href="/contact" className="text-gray-400 hover:text-orange-500 text-xs">
+            </Link>            <Link href="/about" className="text-gray-400 hover:text-orange-500 text-xs">
+              About
+            </Link>            <Link href="/contact" className="text-gray-400 hover:text-orange-500 text-xs">
               Contact
             </Link>
             <Link href="/terms" className="text-gray-400 hover:text-orange-500 text-xs">
@@ -78,6 +79,14 @@ export default function Footer() {
                   className="text-gray-400 hover:text-orange-500 transition-colors text-sm"
                 >
                   Leaderboard
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/about"
+                  className="text-gray-400 hover:text-orange-500 transition-colors text-sm"
+                >
+                  About Us
                 </Link>
               </li>
               <li>

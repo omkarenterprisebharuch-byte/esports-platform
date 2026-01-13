@@ -108,6 +108,9 @@ export default function HomePage() {
               <Link href="/hall-of-fame" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition">
                 Hall of Fame
               </Link>
+              <Link href="/about" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition">
+                About
+              </Link>
             </nav>
 
             <div className="flex items-center gap-3">

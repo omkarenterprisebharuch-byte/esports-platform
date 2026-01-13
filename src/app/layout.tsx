@@ -11,6 +11,7 @@ import { NavigationLoader } from "@/components/ui/Loader";
 import ConditionalFooter from "@/components/ui/ConditionalFooter";
 import { DevelopmentNotice } from "@/components/ui/DevelopmentNotice";
 import { Providers } from "@/components/Providers";
+import { CookieConsent } from "@/components/ui/CookieConsent";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -91,6 +92,7 @@ export default function RootLayout({
                   {children}
                 </main>
                 <ConditionalFooter />
+                <CookieConsent />
                 <DevelopmentNotice 
                   position="bottom-right"
                   autoDismissDelay={5000}
