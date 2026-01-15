@@ -10,6 +10,7 @@ import {
   unauthorizedResponse,
   serverErrorResponse,
 } from "@/lib/api-response";
+import { cache, TTL, cacheKeys } from "@/lib/redis";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -22,6 +23,16 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+
+    // Try cache first for leaderboard (5 minute TTL)
+    const cacheKey = cacheKeys.tournamentLeaderboard(id);
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return successResponse({
+        ...cached,
+        _cached: true,
+      });
+    }
 
     // Check if tournament exists
     const tournamentResult = await pool.query(
@@ -68,7 +79,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       [id]
     );
 
-    return successResponse({
+    const responseData = {
       tournament: {
         id: tournament.id,
         tournament_name: tournament.tournament_name,
@@ -77,7 +88,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         status: tournament.computed_status,
       },
       leaderboard: leaderboardResult.rows,
-    });
+    };
+
+    // Cache the result (longer TTL for completed tournaments)
+    const cacheTtl = tournament.computed_status === "completed" ? TTL.LONG : TTL.MEDIUM;
+    await cache.set(cacheKey, responseData, cacheTtl);
+
+    return successResponse(responseData);
   } catch (error) {
     console.error("Get leaderboard error:", error);
     return serverErrorResponse(error);
@@ -251,6 +268,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ORDER BY l."position" ASC`,
       [id]
     );
+
+    // Invalidate leaderboard cache
+    await cache.del(cacheKeys.tournamentLeaderboard(id));
 
     // On-demand ISR revalidation for public pages with leaderboard data
     try {

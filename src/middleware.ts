@@ -47,7 +47,7 @@ const csrfExemptPaths = [
 ];
 
 // Paths that require host/admin role
-const adminPaths = ["/admin", "/app/admin"];
+const adminPaths = ["/admin", "/app/admin", "/owner", "/app/owner"];
 
 // Paths that need auth - redirect to login with return URL
 const protectedPaths = [

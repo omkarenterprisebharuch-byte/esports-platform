@@ -7,20 +7,18 @@ import Image from "next/image";
 import { useSidebar } from "@/contexts/SidebarContext";
 
 interface NavItem {
-  icon: React.ReactNode | string;
+  icon: string;
   label: string;
   href: string;
   badge?: string | number;
 }
 
-interface AppSidebarProps {
+interface OwnerSidebarProps {
   user: {
     id: number;
     username: string;
     email?: string;
     avatar_url?: string;
-    is_host?: boolean;
-    is_admin?: boolean;
     role?: "player" | "organizer" | "owner";
   };
   onLogout: () => void;
@@ -28,36 +26,28 @@ interface AppSidebarProps {
   onClose: () => void;
 }
 
-// Navigation items
-const mainNavItems: NavItem[] = [
-  { icon: "🏠", label: "Home", href: "/app" },
-  { icon: "🎮", label: "Tournaments", href: "/app/tournaments" },
-  { icon: "📋", label: "My Registrations", href: "/app/registrations" },
-  { icon: "👥", label: "My Teams", href: "/app/teams" },
+// Owner navigation items
+const ownerNavItems: NavItem[] = [
+  { icon: "📊", label: "Dashboard", href: "/owner" },
+  { icon: "👥", label: "User Management", href: "/owner/users" },
+  { icon: "📺", label: "Advertisements", href: "/owner/ads" },
+  { icon: "💰", label: "Deposit Requests", href: "/owner/deposits" },
+  { icon: "📈", label: "System Monitoring", href: "/owner/monitoring" },
 ];
 
-const accountNavItems: NavItem[] = [
-  { icon: "👤", label: "Profile", href: "/app/profile" },
-  { icon: "💰", label: "Wallet", href: "/app/wallet" },
+// Quick navigation
+const quickNavItems: NavItem[] = [
+  { icon: "⚙️", label: "Admin Panel", href: "/admin" },
+  { icon: "🏠", label: "Back to App", href: "/app" },
 ];
 
-const publicNavItems: NavItem[] = [
-  { icon: "🏆", label: "Leaderboard", href: "/leaderboard" },
-  { icon: "🏅", label: "Hall of Fame", href: "/app/hall-of-fame" },
-];
-
-export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps) {
+export function OwnerSidebar({ user, onLogout, isOpen, onClose }: OwnerSidebarProps) {
   const pathname = usePathname();
   const { isCollapsed, toggleCollapse } = useSidebar();
-  const isAdminOrHost = user?.is_admin || user?.is_host;
-  const isOwner = user?.role === "owner";
 
   const NavLink = ({ item }: { item: NavItem }) => {
     const isActive = pathname === item.href || 
-      (item.href !== "/app" && pathname?.startsWith(item.href));
-    const icon = typeof item.icon === "string" ? (
-      <span className="text-lg">{item.icon}</span>
-    ) : item.icon;
+      (item.href !== "/owner" && pathname?.startsWith(item.href));
 
     return (
       <Link
@@ -69,18 +59,18 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
           transition-all duration-200
           ${isCollapsed ? "justify-center" : ""}
           ${isActive
-            ? "bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm"
+            ? "bg-purple-600 text-white shadow-sm"
             : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
           }
         `}
       >
-        {icon}
+        <span className="text-lg">{item.icon}</span>
         {!isCollapsed && <span className="flex-1">{item.label}</span>}
         {!isCollapsed && item.badge !== undefined && (
           <span className={`
             px-2 py-0.5 text-xs font-semibold rounded-full
             ${isActive 
-              ? "bg-white/20 text-white dark:bg-gray-900/20 dark:text-gray-900" 
+              ? "bg-white/20 text-white" 
               : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
             }
           `}>
@@ -110,31 +100,31 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
     <>
       {/* Logo */}
       <div className={`flex items-center gap-2 px-2 mb-8 ${isCollapsed ? "justify-center" : ""}`}>
-        <span className="text-2xl">🎮</span>
+        <span className="text-2xl">👑</span>
         {!isCollapsed && (
           <span className="text-lg font-bold text-gray-900 dark:text-white">
-            Nova Tourney
+            Owner Portal
           </span>
         )}
       </div>
 
       {/* User Profile Card */}
-      <div className={`bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-800/50 rounded-2xl p-4 mb-6 ${isCollapsed ? "p-2" : ""}`}>
+      <div className={`bg-gradient-to-br from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-900/10 rounded-2xl p-4 mb-6 ${isCollapsed ? "p-2" : ""}`}>
         <div className={`flex items-center gap-3 ${isCollapsed ? "justify-center" : ""}`}>
           <Image
-            src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}&background=111827&color=fff`}
+            src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.username}&background=9333ea&color=fff`}
             alt={user.username}
             width={isCollapsed ? 36 : 44}
             height={isCollapsed ? 36 : 44}
-            className="rounded-full ring-2 ring-white dark:ring-gray-700"
+            className="rounded-full ring-2 ring-white dark:ring-purple-700"
           />
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-gray-900 dark:text-white truncate">
                 {user.username}
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {isOwner ? "👑 Owner" : isAdminOrHost ? "⚙️ Host" : "🎮 Player"}
+              <p className="text-xs text-purple-600 dark:text-purple-400 truncate">
+                👑 Platform Owner
               </p>
             </div>
           )}
@@ -143,81 +133,8 @@ export function AppSidebar({ user, onLogout, isOpen, onClose }: AppSidebarProps)
 
       {/* Navigation Sections */}
       <div className="flex-1 overflow-y-auto">
-        <NavSection title="Main" items={mainNavItems} />
-        <NavSection title="Account" items={accountNavItems} />
-        <NavSection title="Community" items={publicNavItems} />
-
-        {/* Admin/Host Section */}
-        {isAdminOrHost && (
-          <div className="mb-6">
-            {!isCollapsed && (
-              <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Management
-              </h3>
-            )}
-            <nav className="space-y-1">
-              <Link
-                href="/admin"
-                onClick={onClose}
-                title={isCollapsed ? "Admin Panel" : undefined}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
-                  transition-all duration-200
-                  ${isCollapsed ? "justify-center" : ""}
-                  ${pathname === "/admin" || pathname?.startsWith("/admin/")
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
-                  }
-                `}
-              >
-                <span>⚙️</span>
-                {!isCollapsed && <span>Admin Panel</span>}
-              </Link>
-              <Link
-                href="/admin/leagues"
-                onClick={onClose}
-                title={isCollapsed ? "League Management" : undefined}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
-                  transition-all duration-200
-                  ${isCollapsed ? "justify-center" : ""}
-                  ${pathname === "/admin/leagues"
-                    ? "bg-cyan-600 text-white shadow-sm"
-                    : "text-cyan-700 dark:text-cyan-300 bg-cyan-50 dark:bg-cyan-900/30 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
-                  }
-                `}
-              >
-                <span>🏆</span>
-                {!isCollapsed && <span>League Management</span>}
-              </Link>
-            </nav>
-          </div>
-        )}
-
-        {/* Owner Section */}
-        {isOwner && (
-          <div className="mb-6">
-            <nav className="space-y-1">
-              <Link
-                href="/owner"
-                onClick={onClose}
-                title={isCollapsed ? "Owner Portal" : undefined}
-                className={`
-                  flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
-                  transition-all duration-200
-                  ${isCollapsed ? "justify-center" : ""}
-                  ${pathname?.startsWith("/owner")
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50"
-                  }
-                `}
-              >
-                <span>👑</span>
-                {!isCollapsed && <span>Owner Portal</span>}
-              </Link>
-            </nav>
-          </div>
-        )}
+        <NavSection title="Owner" items={ownerNavItems} />
+        <NavSection title="Navigation" items={quickNavItems} />
       </div>
 
       {/* Logout Button */}

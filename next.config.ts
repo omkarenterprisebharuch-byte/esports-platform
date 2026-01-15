@@ -318,6 +318,34 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  // Redirects for backward compatibility (old admin/owner URLs -> new URLs)
+  async redirects() {
+    return [
+      // Admin panel redirects
+      {
+        source: "/app/admin",
+        destination: "/admin",
+        permanent: true,
+      },
+      {
+        source: "/app/admin/:path*",
+        destination: "/admin/:path*",
+        permanent: true,
+      },
+      // Owner portal redirects
+      {
+        source: "/app/owner",
+        destination: "/owner",
+        permanent: true,
+      },
+      {
+        source: "/app/owner/:path*",
+        destination: "/owner/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default withBundleAnalyzer(nextConfig);

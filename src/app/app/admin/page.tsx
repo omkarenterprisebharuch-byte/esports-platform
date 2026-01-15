@@ -433,6 +433,17 @@ export default function AdminPage() {
             </div>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Registrations</span>
           </Link>
+
+          <Link
+            href="/app/admin/leagues"
+            className="flex flex-col items-center gap-2 p-4 bg-gradient-to-br from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 
+                       rounded-xl border border-cyan-200 dark:border-cyan-800 hover:shadow-lg hover:scale-[1.02] transition-all group"
+          >
+            <div className="w-12 h-12 bg-cyan-100 dark:bg-cyan-900/50 rounded-xl flex items-center justify-center group-hover:bg-cyan-200 dark:group-hover:bg-cyan-900 transition">
+              <svg className="w-6 h-6 text-cyan-600 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+            </div>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">Leagues</span>
+          </Link>
         </div>
       </div>
 

@@ -16,6 +16,11 @@ import {
   tournamentListLimit,
   getBotSignals 
 } from "@/lib/rate-limit-distributed";
+import {
+  decodeCursor,
+  encodeCursor,
+  buildPaginationResponse,
+} from "@/lib/pagination";
 
 /**
  * GET /api/tournaments
@@ -31,7 +36,8 @@ import {
  * - start_date: filter tournaments starting after this date
  * - end_date: filter tournaments starting before this date
  * - sort: sorting option (prize_desc, prize_asc, date_asc, date_desc, popularity)
- * - page: pagination page number
+ * - page: pagination page number (legacy offset pagination)
+ * - cursor: cursor for cursor-based pagination (preferred)
  * - limit: results per page
  */
 export async function GET(request: NextRequest) {
@@ -74,11 +80,18 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("start_date");
     const endDate = searchParams.get("end_date");
     const sort = searchParams.get("sort") || "date_asc";
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = (page - 1) * limit;
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
     const templates = searchParams.get("templates");
     const search = searchParams.get("search");
+
+    // Support both cursor-based and offset-based pagination
+    const cursorParam = searchParams.get("cursor");
+    const cursor = decodeCursor(cursorParam);
+    const useCursorPagination = !!cursorParam;
+    
+    // Legacy offset pagination (for backwards compatibility)
+    const page = parseInt(searchParams.get("page") || "1");
+    const offset = (page - 1) * limit;
 
     // Get user for hosted filter and for hiding completed tournaments
     let userId: string | null = null;
@@ -297,8 +310,56 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    query += ` ORDER BY ${orderBy} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limit, offset);
+    // Determine sort field for cursor pagination
+    let sortField = "t.registration_start_date";
+    let sortDir: "ASC" | "DESC" = "ASC";
+    switch (sort) {
+      case "prize_desc":
+        sortField = "t.prize_pool";
+        sortDir = "DESC";
+        break;
+      case "prize_asc":
+        sortField = "t.prize_pool";
+        sortDir = "ASC";
+        break;
+      case "date_desc":
+        sortField = "t.tournament_start_date";
+        sortDir = "DESC";
+        break;
+      case "date_asc":
+        sortField = "t.tournament_start_date";
+        sortDir = "ASC";
+        break;
+      case "popularity":
+        sortField = "t.max_teams";
+        sortDir = "DESC";
+        break;
+    }
+
+    // Add cursor condition if using cursor pagination
+    if (useCursorPagination && cursor) {
+      const comparator = sortDir === "DESC" ? "<" : ">";
+      query += ` AND (
+        ${sortField} ${comparator} $${paramIndex}
+        OR (${sortField} = $${paramIndex} AND t.id ${comparator} $${paramIndex + 1})
+      )`;
+      params.push(cursor.value, cursor.id);
+      paramIndex += 2;
+    }
+
+    // Add tie-breaker to ORDER BY for consistent cursor pagination
+    query += ` ORDER BY ${orderBy}, t.id ${sortDir}`;
+    
+    // Fetch one extra row to determine if there's a next page
+    const fetchLimit = useCursorPagination ? limit + 1 : limit;
+    query += ` LIMIT $${paramIndex}`;
+    params.push(fetchLimit);
+    
+    // Only use offset for legacy pagination
+    if (!useCursorPagination) {
+      query += ` OFFSET $${paramIndex + 1}`;
+      params.push(offset);
+    }
 
     const result = await pool.query(query, params);
 
@@ -381,6 +442,63 @@ export async function GET(request: NextRequest) {
     const countResult = await pool.query(countQuery, countParams);
     const total = parseInt(countResult.rows[0].count);
 
+    // Handle cursor pagination response
+    if (useCursorPagination) {
+      const hasNextPage = tournaments.length > limit;
+      const paginatedTournaments = hasNextPage ? tournaments.slice(0, limit) : tournaments;
+      
+      // Build next cursor from last item
+      let nextCursor: string | null = null;
+      if (hasNextPage && paginatedTournaments.length > 0) {
+        const lastItem = paginatedTournaments[paginatedTournaments.length - 1];
+        // Get the sort field value based on current sort
+        let cursorValue: string | number;
+        switch (sort) {
+          case "prize_desc":
+          case "prize_asc":
+            cursorValue = lastItem.prize_pool;
+            break;
+          case "date_desc":
+          case "date_asc":
+            cursorValue = lastItem.tournament_start_date;
+            break;
+          case "popularity":
+            cursorValue = lastItem.max_teams;
+            break;
+          default:
+            cursorValue = lastItem.registration_start_date;
+        }
+        nextCursor = encodeCursor({
+          value: cursorValue,
+          id: lastItem.id,
+          direction: sortDir,
+        });
+      }
+
+      // Cache the result for public requests (5 minute TTL)
+      if (cacheKey) {
+        cache.set(cacheKey, { tournaments: paginatedTournaments, total }, TTL.MEDIUM).catch(() => {});
+      }
+
+      return successResponse(
+        {
+          tournaments: paginatedTournaments,
+          pagination: {
+            limit,
+            total,
+            hasNextPage,
+            hasPrevPage: !!cursor,
+            nextCursor,
+            prevCursor: null, // For simplicity, not implementing backward pagination
+          },
+        },
+        undefined,
+        200,
+        { maxAge: 30, staleWhileRevalidate: 60, isPrivate: false }
+      );
+    }
+
+    // Legacy offset pagination response
     // Cache the result for public requests (5 minute TTL)
     if (cacheKey) {
       cache.set(cacheKey, { tournaments, total }, TTL.MEDIUM).catch(() => {});

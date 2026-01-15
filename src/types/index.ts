@@ -92,6 +92,8 @@ export interface Tournament {
   is_template: boolean;
   template_id?: string; // UUID reference to parent template
   last_published_at?: Date;
+  // League fields
+  is_league_enabled?: boolean;
   created_at: Date;
   updated_at: Date;
 }
